@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.conversation import Conversation
 from app.models.conversation_member import ConversationMember
 from app.models.message import Message
 from app.models.notification import NotificationType
-from app.models.user import User
+from app.models.teacher_assignment import TeacherAssignment
+from app.models.user import User, UserRole
 from app.schemas.announcement import AnnouncementAuthorResponse
 from app.schemas.conversation import ConversationResponse
 from app.schemas.message import MessageResponse
@@ -53,6 +54,7 @@ def _build_conversation_response(
     )
     last_message = (
         db.query(Message)
+        .options(joinedload(Message.sender))
         .filter(Message.conversation_id == conversation.id)
         .order_by(Message.created_at.desc())
         .first()
@@ -142,11 +144,68 @@ def get_conversation(db: Session, conversation_id: int, current_user: User) -> C
     return _build_conversation_response(db, conversation, current_user)
 
 
+def list_contacts(db: Session, current_user: User) -> list[User]:
+    """Personnes avec qui l'utilisateur peut démarrer une conversation 1-à-1."""
+    query = db.query(User).filter(User.id != current_user.id, User.is_active.is_(True))
+    if current_user.role == UserRole.ADMIN:
+        return query.order_by(User.last_name, User.first_name).all()
+
+    ids: set[int] = set()
+    staff = (
+        db.query(User.id)
+        .filter(
+            User.role.in_([UserRole.TEACHER, UserRole.ADMIN]),
+            User.id != current_user.id,
+            User.is_active.is_(True),
+        )
+        .all()
+    )
+    ids.update(row[0] for row in staff)
+
+    if current_user.role == UserRole.STUDENT and current_user.class_id is not None:
+        classmates = (
+            db.query(User.id)
+            .filter(User.class_id == current_user.class_id, User.id != current_user.id)
+            .all()
+        )
+        ids.update(row[0] for row in classmates)
+        teachers = (
+            db.query(TeacherAssignment.teacher_id)
+            .filter(TeacherAssignment.class_id == current_user.class_id)
+            .all()
+        )
+        ids.update(row[0] for row in teachers)
+    elif current_user.role == UserRole.TEACHER:
+        class_ids = [
+            row[0]
+            for row in db.query(TeacherAssignment.class_id)
+            .filter(TeacherAssignment.teacher_id == current_user.id)
+            .all()
+        ]
+        if class_ids:
+            students = (
+                db.query(User.id)
+                .filter(User.role == UserRole.STUDENT, User.class_id.in_(class_ids))
+                .all()
+            )
+            ids.update(row[0] for row in students)
+
+    if not ids:
+        return []
+    return (
+        db.query(User)
+        .filter(User.id.in_(ids), User.is_active.is_(True))
+        .order_by(User.last_name, User.first_name)
+        .all()
+    )
+
+
 def list_messages(db: Session, conversation_id: int, current_user: User) -> list[Message]:
     _get_conversation_or_404(db, conversation_id)
     ensure_is_member(db, conversation_id, current_user)
     return (
         db.query(Message)
+        .options(joinedload(Message.sender))
         .filter(Message.conversation_id == conversation_id)
         .order_by(Message.created_at)
         .all()
@@ -161,6 +220,7 @@ def send_message(db: Session, conversation_id: int, content: str, current_user: 
     db.add(message)
     db.commit()
     db.refresh(message)
+    _ = message.sender
 
     recipient_ids = [
         row[0]

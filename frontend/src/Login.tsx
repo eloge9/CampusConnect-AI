@@ -22,7 +22,7 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false)
 
   if (!loading && user) {
-    return <Navigate to={locState?.from || homeForRole(user.role)} replace />
+    return <Navigate to={homeForRole(user.role)} replace />
   }
 
   const onSubmit = async (e: FormEvent) => {

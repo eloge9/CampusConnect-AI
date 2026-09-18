@@ -20,6 +20,11 @@ import { AbsenceStatusChip } from './components/AbsenceActions'
 import { Inbox } from './components/Inbox'
 import { LoadState } from './components/LoadState'
 import { LostFoundForm } from './components/LostFoundForm'
+import {
+  ANNOUNCEMENT_CATEGORIES,
+  CATEGORY_LABELS,
+  type AnnouncementCategory,
+} from './announcementCategory'
 import { Icons } from './icons'
 import { Shell } from './layout'
 import { useUi } from './ui'
@@ -42,6 +47,7 @@ export function StudentDashboard() {
   const [loading, setLoading] = useState(true)
   const [absScheduleId, setAbsScheduleId] = useState('')
   const [absReason, setAbsReason] = useState('')
+  const [annCat, setAnnCat] = useState<'ALL' | AnnouncementCategory>('ALL')
 
   const load = useCallback(async () => {
     try {
@@ -67,7 +73,7 @@ export function StudentDashboard() {
       setConversations(convos)
       setAbsences(abs)
       const lostIds = objets
-        .filter((o) => o.item_type === 'PERDU' && o.reporter.id === user?.id)
+        .filter((o) => o.reporter.id === user?.id)
         .map((o) => o.id)
       const found = await Promise.all(
         lostIds.map((id) =>
@@ -178,6 +184,17 @@ export function StudentDashboard() {
     }
   }
 
+  const changedSessions = useMemo(
+    () => schedules.filter((s) => s.status === 'MODIFIE' || s.status === 'ANNULE'),
+    [schedules],
+  )
+  const upcomingSessions = useMemo(
+    () =>
+      [...schedules].sort(
+        (a, b) => scheduleStart(a).getTime() - scheduleStart(b).getTime(),
+      ),
+    [schedules],
+  )
   const firstMatch = matches[0]
 
   return (
@@ -213,7 +230,11 @@ export function StudentDashboard() {
           showDash || section === 'time' || section === 'exams' || section === 'msg' || section === 'abs'
         const showSide = notifsOpen || showDash || section === 'ai' || section === 'lost'
         const filteredHomework = homework.filter((h) => match(h.title + h.meta))
-        const filteredAnns = announcements.filter((a) => match(a.title + a.content))
+        const filteredAnns = announcements.filter((a) => {
+          if (!match(a.title + a.content)) return false
+          if (annCat !== 'ALL' && a.category !== annCat) return false
+          return true
+        })
 
         return (
           <div className="nx-page">
@@ -269,7 +290,11 @@ export function StudentDashboard() {
                         {nextCourse ? (
                           <>
                             <div className="chip navy">{nextCourse.affectation.subject.code}</div>{' '}
-                            <span className="chip info">{nextCourse.status}</span>
+                            <span
+                              className={`chip ${nextCourse.status === 'MODIFIE' ? 'warning' : nextCourse.status === 'ANNULE' ? 'danger' : 'info'}`}
+                            >
+                              {nextCourse.status}
+                            </span>
                             <h3 className="course-title">{nextCourse.affectation.subject.name}</h3>
                             <div className="meta-row">
                               <span>
@@ -286,6 +311,40 @@ export function StudentDashboard() {
                           </>
                         ) : (
                           <p className="hint">Aucun cours à venir dans l’emploi du temps.</p>
+                        )}
+                        {changedSessions.length > 0 && (
+                          <div className="ann" style={{ marginTop: 12 }}>
+                            <div className="kicker">
+                              <span>CHANGEMENT DÉTECTÉ</span>
+                            </div>
+                            {changedSessions.map((s) => (
+                              <p key={s.id}>
+                                {s.affectation.subject.name} · {formatDate(s.session_date)} · {s.room} —{' '}
+                                {s.status === 'ANNULE' ? 'séance annulée' : 'séance modifiée'}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        {section === 'time' && (
+                          <div style={{ marginTop: 16 }}>
+                            <h3 className="course-title">Toutes les séances</h3>
+                            {upcomingSessions.map((s) => (
+                              <div className="homework nx-row" key={s.id}>
+                                <div>
+                                  <h4>{s.affectation.subject.name}</h4>
+                                  <p>
+                                    {formatDate(s.session_date)} · {formatTime(s.start_time)}–
+                                    {formatTime(s.end_time)} · {s.room}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`chip ${s.status === 'MODIFIE' ? 'warning' : s.status === 'ANNULE' ? 'danger' : 'info'}`}
+                                >
+                                  {s.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </article>
                     )}
@@ -335,13 +394,32 @@ export function StudentDashboard() {
                     {showDash && (
                       <article className="card">
                         <div className="card-h">
-                          <h2>Dernières annonces du campus</h2>
+                          <h2>Fil d’actualité du campus</h2>
+                        </div>
+                        <div className="login-demos" style={{ marginBottom: 12 }}>
+                          <button
+                            className={`chip ${annCat === 'ALL' ? 'navy' : 'info'}`}
+                            type="button"
+                            onClick={() => setAnnCat('ALL')}
+                          >
+                            Toutes
+                          </button>
+                          {ANNOUNCEMENT_CATEGORIES.map((c) => (
+                            <button
+                              key={c}
+                              className={`chip ${annCat === c ? 'navy' : 'info'}`}
+                              type="button"
+                              onClick={() => setAnnCat(c)}
+                            >
+                              {CATEGORY_LABELS[c]}
+                            </button>
+                          ))}
                         </div>
                         {filteredAnns.length === 0 && <p className="hint">Aucune annonce pour le moment.</p>}
-                        {filteredAnns.slice(0, 5).map((a) => (
+                        {filteredAnns.slice(0, 8).map((a) => (
                           <div className="ann" key={a.id}>
                             <div className="kicker">
-                              <span>{a.category.replaceAll('_', ' ')}</span>
+                              <span>{CATEGORY_LABELS[a.category as AnnouncementCategory] ?? a.category}</span>
                               <span style={{ fontWeight: 500, letterSpacing: 0 }}>
                                 {formatWhen(a.created_at)}
                               </span>
@@ -467,7 +545,15 @@ export function StudentDashboard() {
                           </h2>
                         </div>
                         <div className="nx-activity">
-                          {notifications.slice(0, 5).map((n) => (
+                          {notifications
+                            .slice()
+                            .sort((a, b) => {
+                              const rank = (t: string) =>
+                                t === 'CHANGEMENT_SEANCE' || t === 'CORRESPONDANCE_OBJET' ? 0 : 1
+                              return rank(a.type) - rank(b.type)
+                            })
+                            .slice(0, 5)
+                            .map((n) => (
                             <div className="nx-activity-item" key={n.id}>
                               <span className={`chip ${n.is_read ? 'info' : 'warning'}`}>
                                 <Icons.alert size={12} />

@@ -5,11 +5,25 @@ import {
   fullName,
   type ChatMessage,
   type Conversation,
+  type UserRole,
 } from '../api'
 import { useAuth } from '../auth'
 import { Icons } from '../icons'
 import { useUi } from '../ui'
 import { LoadState } from './LoadState'
+
+type Contact = {
+  id: number
+  first_name: string
+  last_name: string
+  role: UserRole
+}
+
+const ROLE_FR: Record<UserRole, string> = {
+  STUDENT: 'Étudiant',
+  TEACHER: 'Enseignant',
+  ADMIN: 'Admin',
+}
 
 export function Inbox({
   conversations,
@@ -24,6 +38,15 @@ export function Inbox({
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [draft, setDraft] = useState('')
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [picked, setPicked] = useState('')
+  const [starting, setStarting] = useState(false)
+
+  useEffect(() => {
+    void api<Contact[]>('/conversations/destinataires')
+      .then(setContacts)
+      .catch((err) => toast(err instanceof Error ? err.message : 'Contacts indisponibles.'))
+  }, [toast])
 
   const open = async (id: number) => {
     setActiveId(id)
@@ -32,7 +55,6 @@ export function Inbox({
       const list = await api<ChatMessage[]>(`/conversations/${id}/messages`)
       setMessages(list)
       await api(`/conversations/${id}/lire`, { method: 'POST' })
-      await onRefresh()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Conversation indisponible.')
     } finally {
@@ -41,11 +63,32 @@ export function Inbox({
   }
 
   useEffect(() => {
-    if (activeId && !conversations.some((c) => c.id === activeId)) {
+    if (activeId && conversations.length > 0 && !conversations.some((c) => c.id === activeId)) {
       setActiveId(null)
       setMessages([])
     }
   }, [conversations, activeId])
+
+  const startConversation = async () => {
+    if (!picked) {
+      toast('Choisissez un destinataire.')
+      return
+    }
+    setStarting(true)
+    try {
+      const conv = await api<Conversation>('/conversations', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: Number(picked) }),
+      })
+      setPicked('')
+      await onRefresh()
+      await open(conv.id)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Impossible de créer la conversation.')
+    } finally {
+      setStarting(false)
+    }
+  }
 
   const send = async () => {
     if (!activeId || !draft.trim()) return
@@ -67,7 +110,33 @@ export function Inbox({
   return (
     <div className="inbox">
       <div className="inbox-list">
-        <LoadState loading={false} empty={conversations.length === 0} emptyText="Aucune conversation.">
+        <form
+          className="login-form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void startConversation()
+          }}
+        >
+          <label>
+            Nouvelle conversation
+            <select value={picked} onChange={(e) => setPicked(e.target.value)} required>
+              <option value="">Choisir un destinataire</option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {fullName(c)} ({ROLE_FR[c.role]})
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="btn btn-accent" type="submit" disabled={starting || contacts.length === 0}>
+            {starting ? 'Ouverture…' : 'Démarrer'}
+          </button>
+        </form>
+        <LoadState
+          loading={false}
+          empty={conversations.length === 0}
+          emptyText="Aucune conversation. Choisissez un destinataire ci-dessus."
+        >
           {conversations.map((c) => {
             const other = c.members.find((m) => m.id !== user?.id) ?? c.members[0]
             const label = c.is_group ? `Groupe #${c.id}` : other ? fullName(other) : `Conversation #${c.id}`
@@ -92,16 +161,16 @@ export function Inbox({
             )
           })}
         </LoadState>
-        <p className="hint">
-          Démarrer une nouvelle conversation 1-à-1 exige `POST /conversations` avec `user_id`. Aucun
-          endpoint de liste d’utilisateurs n’existe pour STUDENT/TEACHER — à ajouter côté backend.
-        </p>
       </div>
       <div className="inbox-thread">
-        {!active && <p className="hint">Sélectionnez une conversation.</p>}
+        {!active && <p className="hint">Sélectionnez une conversation ou démarrez-en une.</p>}
         {active && (
           <>
-            <LoadState loading={loadingMsgs} empty={messages.length === 0} emptyText="Aucun message.">
+            {loadingMsgs ? (
+              <p className="hint load-hint">Chargement des messages…</p>
+            ) : messages.length === 0 ? (
+              <p className="hint">Aucun message. Écrivez le premier.</p>
+            ) : (
               <div className="inbox-msgs">
                 {messages.map((m) => (
                   <div key={m.id} className={`nx-bubble ${m.sender.id === user?.id ? 'me' : 'ai'}`}>
@@ -111,7 +180,7 @@ export function Inbox({
                   </div>
                 ))}
               </div>
-            </LoadState>
+            )}
             <form
               className="ai-input"
               onSubmit={(e) => {

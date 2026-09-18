@@ -4,11 +4,20 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.user import User
+from app.schemas.announcement import AnnouncementAuthorResponse
 from app.schemas.conversation import ConversationCreate, ConversationResponse
 from app.schemas.message import MessageCreate, MessageResponse
 from app.services import conversation_service
 
 router = APIRouter(prefix="/conversations", tags=["Messagerie"])
+# Liste des destinataires avant /{id} pour éviter un 422.
+
+
+@router.get("/destinataires", response_model=list[AnnouncementAuthorResponse])
+def lister_destinataires(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    return conversation_service.list_contacts(db, current_user)
 
 
 @router.post("", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)

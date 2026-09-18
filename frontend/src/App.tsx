@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { AdminHome, AdminLayout } from './admin'
 import type { UserRole } from './api'
-import { useAuth } from './auth'
+import { homeForRole, useAuth } from './auth'
 import { LoginPage } from './Login'
 import {
   DisponibilitePage,
@@ -28,18 +28,32 @@ function RequireAuth({
   children: ReactNode
 }) {
   const { user, loading } = useAuth()
-  const location = useLocation()
 
   if (loading) {
     return <div className="boot-screen">Chargement de la session…</div>
   }
   if (!user) {
-    return <Navigate to="/connexion" replace state={{ from: location.pathname }} />
+    return <Navigate to="/connexion" replace />
   }
   if (!roles.includes(user.role)) {
     return <Navigate to="/interdit" replace />
   }
   return children
+}
+
+function RoleHome() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <div className="boot-screen">Chargement de la session…</div>
+  }
+  if (!user) {
+    return <Navigate to="/connexion" replace />
+  }
+  if (user.role === 'STUDENT') {
+    return <StudentDashboard />
+  }
+  return <Navigate to={homeForRole(user.role)} replace />
 }
 
 function AppRoutes() {
@@ -52,14 +66,7 @@ function AppRoutes() {
         <Route path="/interdit" element={<ForbiddenPage />} />
         <Route path="/erreur" element={<ServerErrorPage />} />
         <Route path="/maintenance" element={<MaintenancePage />} />
-        <Route
-          path="/"
-          element={
-            <RequireAuth roles={['STUDENT']}>
-              <StudentDashboard />
-            </RequireAuth>
-          }
-        />
+        <Route path="/" element={<RoleHome />} />
         <Route
           path="/enseignant"
           element={

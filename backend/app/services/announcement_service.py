@@ -7,6 +7,7 @@ from app.models.notification import NotificationType
 from app.models.school_class import Class
 from app.models.user import User, UserRole
 from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate
+from app.services.announcement_ai import detect_announcement_category
 from app.services.notification_service import get_student_ids_for_class, notify_users
 from app.services.teacher_assignment_service import is_teacher_assigned_to_class
 
@@ -85,7 +86,7 @@ def create_announcement(db: Session, data: AnnouncementCreate, current_user: Use
     announcement = Announcement(
         title=data.title,
         content=data.content,
-        category=data.category,
+        category=detect_announcement_category(data.title, data.content),
         class_id=data.class_id,
         author_id=current_user.id,
     )

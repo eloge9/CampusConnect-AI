@@ -13,6 +13,7 @@ import {
   type Schedule,
   type TeacherAssignment,
 } from './api'
+import { detectAnnouncementCategory, CATEGORY_LABELS } from './announcementCategory'
 import { useAuth } from './auth'
 import { AbsenceActions } from './components/AbsenceActions'
 import { Inbox } from './components/Inbox'
@@ -150,7 +151,7 @@ export function TeacherDashboard() {
         body: JSON.stringify({
           title: announce.trim().slice(0, 80),
           content: announce.trim(),
-          category: 'ADMINISTRATION',
+          category: detectAnnouncementCategory(announce.trim().slice(0, 80), announce.trim()),
         }),
       })
       setAnnounce('')
@@ -237,21 +238,21 @@ export function TeacherDashboard() {
                               disabled={s.status === 'ANNULE'}
                               onClick={() =>
                                 modal({
-                                  title: 'Marquer la séance comme modifiée',
+                                  title: 'Déplacer la séance',
                                   body: (
                                     <p>
-                                      Les étudiants concernés recevront une notification de changement
-                                      de séance.
+                                      La séance passera en salle 302. Les étudiants recevront une
+                                      notification de changement d’emploi du temps.
                                     </p>
                                   ),
                                   confirm: 'Confirmer',
                                   onConfirm: () => {
                                     void api(`/emploi-du-temps/${s.id}`, {
                                       method: 'PUT',
-                                      body: JSON.stringify({ status: 'MODIFIE' }),
+                                      body: JSON.stringify({ room: 'Salle 302' }),
                                     })
                                       .then(() => {
-                                        toast('Séance marquée comme modifiée.')
+                                        toast('Changement de salle notifié aux étudiants.')
                                         return load()
                                       })
                                       .catch((err) =>
@@ -278,6 +279,18 @@ export function TeacherDashboard() {
                           value={announce}
                           onChange={(e) => setAnnounce(e.target.value)}
                         />
+                        {announce.trim() && (
+                          <p className="hint">
+                            Catégorie détectée :{' '}
+                            <strong>
+                              {
+                                CATEGORY_LABELS[
+                                  detectAnnouncementCategory(announce.trim().slice(0, 80), announce)
+                                ]
+                              }
+                            </strong>
+                          </p>
+                        )}
                         <div className="spark-actions">
                           <button className="btn btn-accent" type="button" onClick={() => void publish()}>
                             Publier l’Annonce Campus
