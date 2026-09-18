@@ -154,7 +154,7 @@ Le détail exact des permissions par endpoint est visible dans `/docs` (chaque r
 | Objets perdus/trouvés | `/objets-perdus-trouves` | ✅ (filtres `?type=`, `?statut=`, `?categorie=`, `?recherche=` + upload photo) |
 | Correspondance IA | `/correspondances` | ✅ (générée automatiquement à la création d'un objet, voir note IA ci-dessous) |
 | Notifications | `/notifications` | ✅ (filtre `?non_lues=true`, `POST /{id}/lire`, `POST /lire-tout` — voir note ci-dessous) |
-| Messagerie | — | ⏳ à venir |
+| Messagerie | `/conversations` | ✅ (1-à-1 pour l'instant, voir note ci-dessous) |
 | Assistant IA | — | ⏳ à venir |
 
 ⚠️ Le projet évolue module par module — vérifier `/docs` pour la liste des routes réellement disponibles à un instant donné, ce tableau peut être en retard d'une étape.
@@ -192,11 +192,23 @@ Chaque notification porte `reference_type`/`reference_id` pointant vers la resso
 
 ⚠️ Non implémenté : le rappel "devoir proche de la date limite" (demanderait une tâche planifiée récurrente, pas encore d'infrastructure de ce type) et les notifications push mobiles réelles (Firebase/FCM — demanderait des identifiants Firebase non configurés).
 
-## 10. CORS
+## 10. Messagerie
+
+Conversations **1-à-1 uniquement pour l'instant** (schéma prêt pour du groupe plus tard via `is_group`, mais non exposé) :
+
+- `POST /conversations {"user_id": <id>}` — récupère la conversation existante avec cette personne si elle existe déjà (pas de doublon), sinon en crée une.
+- `GET /conversations` — les miennes, triées par dernier message, avec `last_message` et `unread_count`.
+- `GET /conversations/{id}/messages` — historique complet (pas de pagination pour l'instant).
+- `POST /conversations/{id}/messages {"content": "..."}` — envoyer un message (déclenche une notification `NOUVEAU_MESSAGE` aux autres membres).
+- `POST /conversations/{id}/lire` — marque la conversation comme lue pour l'utilisateur courant.
+
+⚠️ Seuls les membres d'une conversation peuvent la consulter/y écrire — **l'ADMIN n'a pas d'accès de supervision aux conversations privées** (choix délibéré de respect de la vie privée, non demandé explicitement dans le cahier des charges). Pas de temps réel (WebSocket) : le frontend doit interroger `GET /conversations/{id}/messages` périodiquement.
+
+## 11. CORS
 
 Le CORS est activé (`app/main.py`), configurable via `CORS_ALLOWED_ORIGINS` dans `.env`. En développement il est ouvert à toutes les origines (`*`). Pensez à le restreindre à l'URL réelle du frontend avant toute mise en production.
 
-## 11. Erreurs — format standard
+## 12. Erreurs — format standard
 
 Toutes les erreurs suivent le format FastAPI standard :
 
@@ -206,7 +218,7 @@ Toutes les erreurs suivent le format FastAPI standard :
 
 Sauf les erreurs de validation (422) qui suivent le format Pydantic habituel avec une liste détaillée par champ.
 
-## 12. Tests
+## 13. Tests
 
 ```bash
 python -m pytest tests/ -v

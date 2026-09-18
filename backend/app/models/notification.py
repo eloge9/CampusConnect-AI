@@ -13,6 +13,7 @@ class NotificationType(str, enum.Enum):
     NOUVEL_EXAMEN = "NOUVEL_EXAMEN"
     REPONSE_ABSENCE = "REPONSE_ABSENCE"
     CORRESPONDANCE_OBJET = "CORRESPONDANCE_OBJET"
+    NOUVEAU_MESSAGE = "NOUVEAU_MESSAGE"
 
 
 class Notification(Base):

@@ -10,6 +10,9 @@ from app.models.absence_request import AbsenceRequest, AbsenceStatus
 from app.models.lost_found_item import ItemStatus, ItemType, LostFoundItem
 from app.models.potential_match import MatchStatus, PotentialMatch
 from app.models.notification import Notification, NotificationType
+from app.models.conversation import Conversation
+from app.models.conversation_member import ConversationMember
+from app.models.message import Message
 
 __all__ = [
     "User",
@@ -32,4 +35,7 @@ __all__ = [
     "MatchStatus",
     "Notification",
     "NotificationType",
+    "Conversation",
+    "ConversationMember",
+    "Message",
 ]
