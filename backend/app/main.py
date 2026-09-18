@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.routes import (
     absences,
+    administration,
     announcements,
     assignments,
     assistant,
@@ -20,6 +21,7 @@ from app.routes import (
     schedules,
     subjects,
     teacher_assignments,
+    users,
 )
 
 app = FastAPI(title=settings.app_name)
@@ -54,6 +56,8 @@ app.include_router(potential_matches.router)
 app.include_router(notifications.router)
 app.include_router(conversations.router)
 app.include_router(assistant.router)
+app.include_router(users.router)
+app.include_router(administration.router)
 
 
 @app.get("/")

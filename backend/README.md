@@ -156,7 +156,8 @@ Le détail exact des permissions par endpoint est visible dans `/docs` (chaque r
 | Notifications | `/notifications` | ✅ (filtre `?non_lues=true`, `POST /{id}/lire`, `POST /lire-tout` — voir note ci-dessous) |
 | Messagerie | `/conversations` | ✅ (1-à-1 pour l'instant, voir note ci-dessous) |
 | Assistant IA | `/assistant` | ✅ (`POST /assistant/question`, voir note ci-dessous) |
-| Administration | — | ⏳ à venir |
+| Utilisateurs (admin) | `/utilisateurs` | ✅ (filtres `?role=`, `?actif=`, `?recherche=`) |
+| Administration | `/administration` | ✅ (`GET /administration/statistiques`) |
 
 ⚠️ Le projet évolue module par module — vérifier `/docs` pour la liste des routes réellement disponibles à un instant donné, ce tableau peut être en retard d'une étape.
 
@@ -211,11 +212,19 @@ Conversations **1-à-1 uniquement pour l'instant** (schéma prêt pour du groupe
 
 Réponse : `{"intent": "...", "answer": "texte lisible", "data": [...]}` — `data` contient les objets structurés (séance, examen, devoir, annonce, correspondance...) derrière la réponse, à afficher côté frontend en plus du texte. Si la question n'est pas reconnue (`intent: "inconnu"`), l'assistant le dit honnêtement et liste les sujets qu'il sait traiter plutôt que d'improviser une réponse.
 
-## 12. CORS
+## 12. Administration
+
+- `GET /utilisateurs` (`?role=`, `?actif=`, `?recherche=`), `GET /utilisateurs/{id}`, `PUT /utilisateurs/{id}` — réservé ADMIN. Permet de changer le rôle d'un utilisateur, l'activer/désactiver, ou assigner une classe à un étudiant (la contrainte "seul un étudiant peut avoir une classe" est vérifiée en base, renvoie 400 sinon).
+- Pas de suppression d'utilisateur — uniquement désactivation (`is_active=false`), pour ne pas casser l'historique (annonces, messages, absences...) de la personne.
+- Un ADMIN ne peut pas changer son propre rôle ni se désactiver lui-même.
+- `GET /administration/statistiques` — compteurs globaux (utilisateurs par rôle, classes, matières, absences en attente, objets ouverts, correspondances proposées, annonces).
+- Le reste des pouvoirs admin (classes, matières, annonces, emploi du temps, devoirs, examens, modération objets perdus/trouvés) était déjà couvert par les permissions ADMIN de chaque module — rien à ajouter là.
+
+## 13. CORS
 
 Le CORS est activé (`app/main.py`), configurable via `CORS_ALLOWED_ORIGINS` dans `.env`. En développement il est ouvert à toutes les origines (`*`). Pensez à le restreindre à l'URL réelle du frontend avant toute mise en production.
 
-## 13. Erreurs — format standard
+## 14. Erreurs — format standard
 
 Toutes les erreurs suivent le format FastAPI standard :
 
@@ -225,7 +234,7 @@ Toutes les erreurs suivent le format FastAPI standard :
 
 Sauf les erreurs de validation (422) qui suivent le format Pydantic habituel avec une liste détaillée par champ.
 
-## 14. Tests
+## 15. Tests
 
 ```bash
 python -m pytest tests/ -v
