@@ -44,6 +44,20 @@ def list_matches_for_item(db: Session, item_id: int, current_user: User) -> list
     )
 
 
+def list_matches_for_user(db: Session, current_user: User) -> list[PotentialMatch]:
+    return (
+        db.query(PotentialMatch)
+        .filter(
+            or_(
+                PotentialMatch.lost_item.has(LostFoundItem.user_id == current_user.id),
+                PotentialMatch.found_item.has(LostFoundItem.user_id == current_user.id),
+            )
+        )
+        .order_by(PotentialMatch.similarity_score.desc())
+        .all()
+    )
+
+
 def update_match_status(
     db: Session, match_id: int, new_status: MatchStatus, current_user: User
 ) -> PotentialMatch:

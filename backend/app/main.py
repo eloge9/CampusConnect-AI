@@ -9,6 +9,7 @@ from app.routes import (
     absences,
     announcements,
     assignments,
+    assistant,
     auth,
     classes,
     conversations,
@@ -52,6 +53,7 @@ app.include_router(lost_found.router)
 app.include_router(potential_matches.router)
 app.include_router(notifications.router)
 app.include_router(conversations.router)
+app.include_router(assistant.router)
 
 
 @app.get("/")

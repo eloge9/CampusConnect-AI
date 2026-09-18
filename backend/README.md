@@ -155,7 +155,8 @@ Le détail exact des permissions par endpoint est visible dans `/docs` (chaque r
 | Correspondance IA | `/correspondances` | ✅ (générée automatiquement à la création d'un objet, voir note IA ci-dessous) |
 | Notifications | `/notifications` | ✅ (filtre `?non_lues=true`, `POST /{id}/lire`, `POST /lire-tout` — voir note ci-dessous) |
 | Messagerie | `/conversations` | ✅ (1-à-1 pour l'instant, voir note ci-dessous) |
-| Assistant IA | — | ⏳ à venir |
+| Assistant IA | `/assistant` | ✅ (`POST /assistant/question`, voir note ci-dessous) |
+| Administration | — | ⏳ à venir |
 
 ⚠️ Le projet évolue module par module — vérifier `/docs` pour la liste des routes réellement disponibles à un instant donné, ce tableau peut être en retard d'une étape.
 
@@ -204,11 +205,17 @@ Conversations **1-à-1 uniquement pour l'instant** (schéma prêt pour du groupe
 
 ⚠️ Seuls les membres d'une conversation peuvent la consulter/y écrire — **l'ADMIN n'a pas d'accès de supervision aux conversations privées** (choix délibéré de respect de la vie privée, non demandé explicitement dans le cahier des charges). Pas de temps réel (WebSocket) : le frontend doit interroger `GET /conversations/{id}/messages` périodiquement.
 
-## 11. CORS
+## 11. Assistant IA
+
+⚠️ **Ce n'est pas non plus un LLM.** `POST /assistant/question` (`{"question": "..."}`) détecte l'intention par mots-clés français (prochain cours, examens, devoirs, absence, objets perdus, annonces) puis construit sa réponse **uniquement à partir des vraies données de la plateforme**, en réutilisant les services déjà existants (aucune duplication de logique) — conforme à l'exigence du cahier des charges de ne jamais fournir d'information inventée.
+
+Réponse : `{"intent": "...", "answer": "texte lisible", "data": [...]}` — `data` contient les objets structurés (séance, examen, devoir, annonce, correspondance...) derrière la réponse, à afficher côté frontend en plus du texte. Si la question n'est pas reconnue (`intent: "inconnu"`), l'assistant le dit honnêtement et liste les sujets qu'il sait traiter plutôt que d'improviser une réponse.
+
+## 12. CORS
 
 Le CORS est activé (`app/main.py`), configurable via `CORS_ALLOWED_ORIGINS` dans `.env`. En développement il est ouvert à toutes les origines (`*`). Pensez à le restreindre à l'URL réelle du frontend avant toute mise en production.
 
-## 12. Erreurs — format standard
+## 13. Erreurs — format standard
 
 Toutes les erreurs suivent le format FastAPI standard :
 
@@ -218,7 +225,7 @@ Toutes les erreurs suivent le format FastAPI standard :
 
 Sauf les erreurs de validation (422) qui suivent le format Pydantic habituel avec une liste détaillée par champ.
 
-## 13. Tests
+## 14. Tests
 
 ```bash
 python -m pytest tests/ -v
