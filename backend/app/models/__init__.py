@@ -7,6 +7,8 @@ from app.models.schedule import Schedule, ScheduleStatus
 from app.models.assignment import Assignment
 from app.models.exam import Exam
 from app.models.absence_request import AbsenceRequest, AbsenceStatus
+from app.models.lost_found_item import ItemStatus, ItemType, LostFoundItem
+from app.models.potential_match import MatchStatus, PotentialMatch
 
 __all__ = [
     "User",
@@ -22,4 +24,9 @@ __all__ = [
     "Exam",
     "AbsenceRequest",
     "AbsenceStatus",
+    "LostFoundItem",
+    "ItemType",
+    "ItemStatus",
+    "PotentialMatch",
+    "MatchStatus",
 ]

@@ -12,6 +12,8 @@ from app.routes import (
     auth,
     classes,
     exams,
+    lost_found,
+    potential_matches,
     schedules,
     subjects,
     teacher_assignments,
@@ -44,6 +46,8 @@ app.include_router(schedules.router)
 app.include_router(assignments.router)
 app.include_router(exams.router)
 app.include_router(absences.router)
+app.include_router(lost_found.router)
+app.include_router(potential_matches.router)
 
 
 @app.get("/")

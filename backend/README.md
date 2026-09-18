@@ -151,7 +151,8 @@ Le détail exact des permissions par endpoint est visible dans `/docs` (chaque r
 | Devoirs | `/devoirs` | ✅ (filtres `?classe_id=`, `?matiere_id=`, `?a_venir=`) |
 | Examens | `/examens` | ✅ (filtres `?classe_id=`, `?matiere_id=`, `?a_venir=`) |
 | Absences | `/absences` | ✅ (filtres `?statut=`, `?classe_id=` + upload justificatif via `POST /absences/{id}/justificatif`) |
-| Objets perdus/trouvés + IA | — | ⏳ à venir |
+| Objets perdus/trouvés | `/objets-perdus-trouves` | ✅ (filtres `?type=`, `?statut=`, `?categorie=`, `?recherche=` + upload photo) |
+| Correspondance IA | `/correspondances` | ✅ (générée automatiquement à la création d'un objet, voir note IA ci-dessous) |
 | Notifications | — | ⏳ à venir |
 | Messagerie | — | ⏳ à venir |
 | Assistant IA | — | ⏳ à venir |
@@ -165,15 +166,21 @@ Plutôt que d'appeler l'API "à la main", vous pouvez générer un client à par
 - **Web (TypeScript)** : [`openapi-typescript`](https://www.npmjs.com/package/openapi-typescript) ou [`orval`](https://orval.dev/) sur `http://localhost:8000/openapi.json`
 - **Mobile (Dart/Flutter)** : [`openapi-generator`](https://openapi-generator.tech/) avec le générateur `dart-dio`
 
-## 7. Fichiers uploadés (justificatifs d'absence)
+## 7. Correspondance IA (objets perdus/trouvés)
 
-`POST /absences/{id}/justificatif` accepte un fichier en `multipart/form-data` (champ `file`), formats acceptés : PDF/JPG/JPEG/PNG, 5 Mo max (configurable via `.env`). Le fichier est servi ensuite via l'URL relative renvoyée dans `justificatif_path` (ex: `/uploads/justificatifs/xxx.pdf`), à préfixer avec l'URL de base de l'API (`http://localhost:8000/uploads/justificatifs/xxx.pdf`).
+⚠️ **Ce n'est pas un modèle d'IA entraîné.** À la création d'un objet (perdu ou trouvé), le backend compare automatiquement avec les objets ouverts du type opposé via un algorithme de similarité (texte, catégorie, couleur, lieu, date — voir `app/services/lost_found_ai.py`). Au-dessus d'un seuil, une correspondance est créée avec le statut `PROPOSEE`.
 
-## 8. CORS
+Règle stricte du cahier des charges respectée : **le système ne déclare jamais automatiquement qu'un objet appartient à quelqu'un**. Seul un des deux déclarants (ou un ADMIN) peut faire passer une correspondance à `CONFIRMEE` ou `REJETEE` via `PUT /correspondances/{id}`.
+
+## 8. Fichiers uploadés (justificatifs d'absence, photos d'objets)
+
+`POST /absences/{id}/justificatif` (PDF/JPG/JPEG/PNG) et `POST /objets-perdus-trouves/{id}/photo` (JPG/JPEG/PNG) acceptent un fichier en `multipart/form-data` (champ `file`), 5 Mo max (configurable via `.env`). Le fichier est servi ensuite via l'URL relative renvoyée (`photo_path`/`justificatif_path`, ex: `/uploads/objets/xxx.png`), à préfixer avec l'URL de base de l'API (`http://localhost:8000/uploads/objets/xxx.png`).
+
+## 9. CORS
 
 Le CORS est activé (`app/main.py`), configurable via `CORS_ALLOWED_ORIGINS` dans `.env`. En développement il est ouvert à toutes les origines (`*`). Pensez à le restreindre à l'URL réelle du frontend avant toute mise en production.
 
-## 9. Erreurs — format standard
+## 10. Erreurs — format standard
 
 Toutes les erreurs suivent le format FastAPI standard :
 
@@ -183,7 +190,7 @@ Toutes les erreurs suivent le format FastAPI standard :
 
 Sauf les erreurs de validation (422) qui suivent le format Pydantic habituel avec une liste détaillée par champ.
 
-## 10. Tests
+## 11. Tests
 
 ```bash
 python -m pytest tests/ -v
