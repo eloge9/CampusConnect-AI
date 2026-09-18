@@ -38,6 +38,14 @@ function parseDetail(data: unknown): string {
   return 'Impossible de joindre l’API.'
 }
 
+let onUnauthorized: (() => void) | null = null
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler
+}
+
+const AUTH_PUBLIC = ['/auth/connexion', '/auth/inscription']
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers)
   const isForm = options.body instanceof FormData
@@ -51,7 +59,11 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (res.status === 204) return undefined as T
 
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiError(parseDetail(data), res.status)
+  if (!res.ok) {
+    const isPublicAuth = AUTH_PUBLIC.some((p) => path.startsWith(p))
+    if (res.status === 401 && !isPublicAuth) onUnauthorized?.()
+    throw new ApiError(parseDetail(data), res.status)
+  }
   return data as T
 }
 
@@ -79,6 +91,7 @@ export type Subject = {
   id: number
   name: string
   code: string
+  description: string | null
 }
 
 export type TeacherAssignment = {
@@ -138,9 +151,18 @@ export type Notification = {
 
 export type Conversation = {
   id: number
+  is_group: boolean
   members: { id: number; first_name: string; last_name: string; role: UserRole }[]
   last_message: { content: string; created_at: string } | null
   unread_count: number
+}
+
+export type ChatMessage = {
+  id: number
+  conversation_id: number
+  sender: { id: number; first_name: string; last_name: string; role: UserRole }
+  content: string
+  created_at: string
 }
 
 export type LostFoundItem = {
@@ -149,8 +171,11 @@ export type LostFoundItem = {
   item_type: 'PERDU' | 'TROUVE'
   title: string
   description: string
+  category: string | null
+  color: string | null
   location: string
-  status: string
+  photo_path: string | null
+  status: 'OUVERT' | 'RESOLU' | 'FERME'
   item_date: string
 }
 
@@ -169,6 +194,8 @@ export type Absence = {
   reason: string
   justificatif_path: string | null
   status: 'EN_ATTENTE' | 'ACCEPTEE' | 'REFUSEE'
+  review_comment: string | null
+  reviewed_at: string | null
   created_at: string
 }
 

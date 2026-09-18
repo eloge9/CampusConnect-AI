@@ -1,16 +1,24 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AdminHome, AdminLayout } from './admin'
-import { homeForRole, useAuth } from './auth'
+import type { UserRole } from './api'
+import { useAuth } from './auth'
 import { LoginPage } from './Login'
 import {
   DisponibilitePage,
   IncidentsPage,
   UtilisateursActifsPage,
 } from './pages/admin/metrics'
+import {
+  ForbiddenPage,
+  MaintenancePage,
+  NotFoundPage,
+  PublicHome,
+  ServerErrorPage,
+} from './pages/PublicPages'
+import { RegisterPage } from './Register'
 import { StudentDashboard } from './student'
 import { TeacherDashboard } from './teacher'
-import type { UserRole } from './api'
 
 function RequireAuth({
   roles,
@@ -29,7 +37,7 @@ function RequireAuth({
     return <Navigate to="/connexion" replace state={{ from: location.pathname }} />
   }
   if (!roles.includes(user.role)) {
-    return <Navigate to={homeForRole(user.role)} replace />
+    return <Navigate to="/interdit" replace />
   }
   return children
 }
@@ -38,7 +46,12 @@ function AppRoutes() {
   return (
     <div className="app-shell">
       <Routes>
+        <Route path="/accueil" element={<PublicHome />} />
         <Route path="/connexion" element={<LoginPage />} />
+        <Route path="/inscription" element={<RegisterPage />} />
+        <Route path="/interdit" element={<ForbiddenPage />} />
+        <Route path="/erreur" element={<ServerErrorPage />} />
+        <Route path="/maintenance" element={<MaintenancePage />} />
         <Route
           path="/"
           element={
@@ -67,7 +80,7 @@ function AppRoutes() {
           <Route path="/admin/supervision/utilisateurs-actifs" element={<UtilisateursActifsPage />} />
           <Route path="/admin/supervision/incidents" element={<IncidentsPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
   )

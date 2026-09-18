@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { api, getToken, setToken, type User } from './api'
+import { useNavigate } from 'react-router-dom'
+import { api, getToken, setToken, setUnauthorizedHandler, type User } from './api'
 
 type AuthApi = {
   user: User | null
@@ -27,11 +28,21 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
   }, [])
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setToken(null)
+      setUser(null)
+      navigate('/connexion', { replace: true, state: { expired: true } })
+    })
+    return () => setUnauthorizedHandler(null)
+  }, [navigate])
 
   const refreshMe = useCallback(async () => {
     if (!getToken()) {

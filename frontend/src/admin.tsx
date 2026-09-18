@@ -7,7 +7,11 @@ import {
   fullName,
   type Absence,
   type AdminStats,
+  type ClassItem,
   type LostFoundItem,
+  type Schedule,
+  type Subject,
+  type TeacherAssignment,
   type User,
 } from './api'
 import { Card, CardHeader } from './components/Card'
@@ -15,15 +19,15 @@ import { DataTable } from './components/DataTable'
 import { Widget } from './components/Widget'
 import { Icons } from './icons'
 import { Shell } from './layout'
+import {
+  AssignmentsCatalog,
+  ClassesCatalog,
+  SchedulesCatalog,
+  SubjectsCatalog,
+} from './pages/admin/catalog'
 import { useUi } from './ui'
 
 type AdminOutlet = { section: string; query: string }
-
-const ROLE_FR: Record<string, string> = {
-  STUDENT: 'Étudiant',
-  TEACHER: 'Enseignant',
-  ADMIN: 'Admin',
-}
 
 export function AdminLayout() {
   const location = useLocation()
@@ -51,21 +55,36 @@ export function AdminHome() {
   const [users, setUsers] = useState<User[]>([])
   const [absences, setAbsences] = useState<Absence[]>([])
   const [items, setItems] = useState<LostFoundItem[]>([])
+  const [classes, setClasses] = useState<ClassItem[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [assignments, setAssignments] = useState<TeacherAssignment[]>([])
+  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     try {
-      const [st, us, ab, obj] = await Promise.all([
+      const [st, us, ab, obj, cls, mats, aff, edt] = await Promise.all([
         api<AdminStats>('/administration/statistiques'),
         api<User[]>('/utilisateurs'),
         api<Absence[]>('/absences'),
         api<LostFoundItem[]>('/objets-perdus-trouves'),
+        api<ClassItem[]>('/classes'),
+        api<Subject[]>('/matieres'),
+        api<TeacherAssignment[]>('/affectations-enseignants'),
+        api<Schedule[]>('/emploi-du-temps'),
       ])
       setStats(st)
       setUsers(us)
       setAbsences(ab)
       setItems(obj)
+      setClasses(cls)
+      setSubjects(mats)
+      setAssignments(aff)
+      setSchedules(edt)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Chargement API impossible.')
+    } finally {
+      setLoading(false)
     }
   }, [toast])
 
@@ -73,6 +92,29 @@ export function AdminHome() {
     void load()
   }, [load])
 
+  const patchUser = (id: number, data: Partial<User>) => {
+    void api(`/utilisateurs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+      .then(() => {
+        toast('Compte mis à jour.')
+        return load()
+      })
+      .catch((err) => toast(err instanceof Error ? err.message : 'Mise à jour impossible.'))
+  }
+
+  const patchItem = (id: number, status: LostFoundItem['status']) => {
+    void api(`/objets-perdus-trouves/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    })
+      .then(() => {
+        toast('Statut mis à jour.')
+        return load()
+      })
+      .catch((err) => toast(err instanceof Error ? err.message : 'Mise à jour impossible.'))
+  }
   const reviewAbsence = (id: number, status: 'ACCEPTEE' | 'REFUSEE') => {
     void api(`/absences/${id}`, {
       method: 'PUT',
@@ -103,6 +145,7 @@ export function AdminHome() {
           <header className="hz-page-h" id="sec-sup">
             <h1>Console de Supervision CampusConnect AI</h1>
           </header>
+          {loading && <p className="hint load-hint">Chargement en cours…</p>}
 
           <div className="widget-row">
             <Widget
@@ -211,11 +254,16 @@ export function AdminHome() {
           <DataTable
             id="sec-lost"
             title="Modération Objets Trouvés"
-            columns={['Objet', 'Statut', 'Description']}
+            columns={['Objet', 'Statut', 'Description', 'Actions']}
           >
-            {items.length === 0 && (
+            {loading && (
               <tr>
-                <td colSpan={3}>Aucun objet déclaré.</td>
+                <td colSpan={4}>Chargement en cours…</td>
+              </tr>
+            )}
+            {!loading && items.length === 0 && (
+              <tr>
+                <td colSpan={4}>Aucun objet déclaré.</td>
               </tr>
             )}
             {items.map((item) => (
@@ -231,6 +279,34 @@ export function AdminHome() {
                 <td className="td-desc">
                   {item.description} ({item.location})
                 </td>
+                <td>
+                  <div className="actions-row">
+                    <select
+                      value={item.status}
+                      onChange={(e) => patchItem(item.id, e.target.value as LostFoundItem['status'])}
+                    >
+                      <option value="OUVERT">OUVERT</option>
+                      <option value="RESOLU">RESOLU</option>
+                      <option value="FERME">FERME</option>
+                    </select>
+                    <button
+                      className="btn btn-ghost"
+                      type="button"
+                      onClick={() =>
+                        void api(`/objets-perdus-trouves/${item.id}`, { method: 'DELETE' })
+                          .then(() => {
+                            toast('Objet supprimé.')
+                            return load()
+                          })
+                          .catch((err) =>
+                            toast(err instanceof Error ? err.message : 'Suppression impossible.'),
+                          )
+                      }
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </DataTable>
@@ -238,22 +314,92 @@ export function AdminHome() {
       )}
 
       {section === 'users' && (
-        <DataTable id="sec-users" title="Comptes Utilisateurs" columns={['Compte', 'Rôle', 'Statut']}>
-          {filteredUsers.map((u) => (
-            <tr key={u.id}>
-              <td>
-                <strong>{fullName(u)}</strong>
-                <span className="td-sub">{u.email}</span>
-              </td>
-              <td>{ROLE_FR[u.role] ?? u.role}</td>
-              <td>
-                <span className={`chip ${u.is_active ? 'success' : 'danger'}`}>
-                  {u.is_active ? 'Compte actif' : 'Désactivé'}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </DataTable>
+        <>
+          <p className="hint">
+            Pas d’endpoint de création TEACHER/ADMIN : seul `POST /auth/inscription` existe (rôle
+            STUDENT forcé). Promouvoir via le rôle ci-dessous.
+          </p>
+          <DataTable
+            id="sec-users"
+            title="Comptes Utilisateurs"
+            columns={['Compte', 'Rôle', 'Classe', 'Statut']}
+          >
+            {loading && (
+              <tr>
+                <td colSpan={4}>Chargement en cours…</td>
+              </tr>
+            )}
+            {filteredUsers.map((u) => (
+              <tr key={u.id}>
+                <td>
+                  <strong>{fullName(u)}</strong>
+                  <span className="td-sub">{u.email}</span>
+                </td>
+                <td>
+                  <select
+                    value={u.role}
+                    onChange={(e) => {
+                      const role = e.target.value as User['role']
+                      patchUser(u.id, role === 'STUDENT' ? { role } : { role, class_id: null })
+                    }}
+                  >
+                    <option value="STUDENT">Étudiant</option>
+                    <option value="TEACHER">Enseignant</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </td>
+                <td>
+                  {u.role === 'STUDENT' ? (
+                    <select
+                      value={u.class_id ?? ''}
+                      onChange={(e) =>
+                        patchUser(u.id, { class_id: e.target.value ? Number(e.target.value) : null })
+                      }
+                    >
+                      <option value="">Aucune</option>
+                      {classes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+                <td>
+                  <button
+                    className={`btn ${u.is_active ? 'btn-soft-success' : 'btn-ghost'}`}
+                    type="button"
+                    onClick={() => patchUser(u.id, { is_active: !u.is_active })}
+                  >
+                    {u.is_active ? 'Actif — désactiver' : 'Inactif — activer'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
+        </>
+      )}
+
+      {section === 'classes' && (
+        <ClassesCatalog items={classes} loading={loading} onChange={load} />
+      )}
+      {section === 'matieres' && (
+        <SubjectsCatalog items={subjects} loading={loading} onChange={load} />
+      )}
+      {section === 'aff' && (
+        <AssignmentsCatalog
+          items={assignments}
+          teachers={users.filter((u) => u.role === 'TEACHER')}
+          classes={classes}
+          subjects={subjects}
+          loading={loading}
+          onChange={load}
+        />
+      )}
+      {section === 'edt' && (
+        <SchedulesCatalog items={schedules} assignments={assignments} loading={loading} onChange={load} />
       )}
 
       {section === 'audit' && (

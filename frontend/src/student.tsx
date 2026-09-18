@@ -6,6 +6,7 @@ import {
   formatWhen,
   fullName,
   scheduleStart,
+  type Absence,
   type Announcement,
   type Assignment,
   type Conversation,
@@ -15,6 +16,10 @@ import {
   type Schedule,
 } from './api'
 import { useAuth } from './auth'
+import { AbsenceStatusChip } from './components/AbsenceActions'
+import { Inbox } from './components/Inbox'
+import { LoadState } from './components/LoadState'
+import { LostFoundForm } from './components/LostFoundForm'
 import { Icons } from './icons'
 import { Shell } from './layout'
 import { useUi } from './ui'
@@ -32,11 +37,15 @@ export function StudentDashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [matches, setMatches] = useState<PotentialMatch[]>([])
+  const [absences, setAbsences] = useState<Absence[]>([])
   const [health, setHealth] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [absScheduleId, setAbsScheduleId] = useState('')
+  const [absReason, setAbsReason] = useState('')
 
   const load = useCallback(async () => {
     try {
-      const [sante, anns, seances, devoirs, examens, notifs, convos, objets] = await Promise.all([
+      const [sante, anns, seances, devoirs, examens, notifs, convos, objets, abs] = await Promise.all([
         api<{ status: string }>('/sante').catch(() => ({ status: 'down' })),
         api<Announcement[]>('/annonces'),
         api<Schedule[]>('/emploi-du-temps'),
@@ -47,6 +56,7 @@ export function StudentDashboard() {
         api<{ id: number; item_type: string; reporter: { id: number } }[]>(
           '/objets-perdus-trouves',
         ),
+        api<Absence[]>('/absences'),
       ])
       setHealth(sante.status === 'ok')
       setAnnouncements(anns)
@@ -55,6 +65,7 @@ export function StudentDashboard() {
       setExams(examens)
       setNotifications(notifs)
       setConversations(convos)
+      setAbsences(abs)
       const lostIds = objets
         .filter((o) => o.item_type === 'PERDU' && o.reporter.id === user?.id)
         .map((o) => o.id)
@@ -66,6 +77,8 @@ export function StudentDashboard() {
       setMatches(found.flat().filter((m) => m.status === 'PROPOSEE'))
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Chargement API impossible.')
+    } finally {
+      setLoading(false)
     }
   }, [toast, user?.id])
 
@@ -131,72 +144,38 @@ export function StudentDashboard() {
     }
   }
 
-  const declareAbsence = () => {
-    const session = nextCourse ?? schedules[0]
-    if (!session) {
-      toast('Aucun cours en base pour rattacher une absence.')
+  const submitAbsence = async () => {
+    if (!absScheduleId) {
+      toast('Choisissez une séance.')
       return
     }
-    modal({
-      title: 'Déclarer une absence',
-      body: (
-        <p>
-          Absence pour {session.affectation.subject.name} le {formatDate(session.session_date)} (
-          {formatTime(session.start_time)} – {formatTime(session.end_time)}).
-        </p>
-      ),
-      confirm: 'Déclarer',
-      onConfirm: () => {
-        void (async () => {
-          try {
-            await api('/absences', {
-              method: 'POST',
-              body: JSON.stringify({
-                schedule_id: session.id,
-                reason: 'Absence déclarée depuis l’espace étudiant.',
-              }),
-            })
-            toast('Absence déclarée.')
-            await load()
-          } catch (err) {
-            toast(err instanceof Error ? err.message : 'Déclaration impossible.')
-          }
-        })()
-      },
-    })
+    if (!absReason.trim()) {
+      toast('Indiquez un motif.')
+      return
+    }
+    try {
+      await api('/absences', {
+        method: 'POST',
+        body: JSON.stringify({ schedule_id: Number(absScheduleId), reason: absReason.trim() }),
+      })
+      setAbsReason('')
+      toast('Absence déclarée.')
+      await load()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Déclaration impossible.')
+    }
   }
 
-  const declareLost = () => {
-    modal({
-      title: 'Signaler un objet perdu',
-      body: (
-        <p>
-          Une déclaration « objet perdu » sera créée (campus, aujourd’hui) pour lancer la
-          correspondance IA.
-        </p>
-      ),
-      confirm: 'Déclarer',
-      onConfirm: () => {
-        void (async () => {
-          try {
-            await api('/objets-perdus-trouves', {
-              method: 'POST',
-              body: JSON.stringify({
-                item_type: 'PERDU',
-                title: 'Objet perdu',
-                description: 'Déclaration depuis l’espace étudiant.',
-                location: 'Campus',
-                item_date: new Date().toISOString().slice(0, 10),
-              }),
-            })
-            toast('Objet perdu déclaré.')
-            await load()
-          } catch (err) {
-            toast(err instanceof Error ? err.message : 'Déclaration impossible.')
-          }
-        })()
-      },
-    })
+  const uploadJustificatif = async (id: number, file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      await api(`/absences/${id}/justificatif`, { method: 'POST', body: fd })
+      toast('Justificatif envoyé.')
+      await load()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Upload impossible.')
+    }
   }
 
   const firstMatch = matches[0]
@@ -230,7 +209,8 @@ export function StudentDashboard() {
         const q = query.trim().toLowerCase()
         const match = (text: string) => !q || text.toLowerCase().includes(q)
         const showDash = section === 'dash'
-        const showMain = showDash || section === 'time' || section === 'exams' || section === 'msg'
+        const showMain =
+          showDash || section === 'time' || section === 'exams' || section === 'msg' || section === 'abs'
         const showSide = notifsOpen || showDash || section === 'ai' || section === 'lost'
         const filteredHomework = homework.filter((h) => match(h.title + h.meta))
         const filteredAnns = announcements.filter((a) => match(a.title + a.content))
@@ -245,6 +225,7 @@ export function StudentDashboard() {
                     Données chargées depuis l’API CampusConnect. {assignments.length} devoir(s) à
                     venir, {notifications.filter((n) => !n.is_read).length} notification(s) non lue(s).
                   </p>
+                  {loading && <p className="hint load-hint">Chargement en cours…</p>}
                 </header>
                 <div className="nx-stats">
                   <article className="card nx-stat">
@@ -377,23 +358,85 @@ export function StudentDashboard() {
                         <div className="card-h">
                           <h2>Messagerie</h2>
                         </div>
-                        {conversations.length === 0 && (
-                          <p className="hint">Aucune conversation. Elles se créent en 1-à-1 via l’API.</p>
-                        )}
-                        {conversations.map((c) => {
-                          const other = c.members.find((m) => m.id !== user?.id) ?? c.members[0]
-                          return (
-                            <div className="quick" key={c.id}>
-                              <span className="icon-wrap accent">
-                                <Icons.message size={15} />
-                              </span>
-                              <span>
-                                <strong>{other ? fullName(other) : `Conversation #${c.id}`}</strong>
-                                <span>{c.last_message?.content ?? 'Pas encore de message'}</span>
-                              </span>
+                        <LoadState loading={loading} empty={false}>
+                          <Inbox conversations={conversations} onRefresh={load} />
+                        </LoadState>
+                      </article>
+                    )}
+
+                    {section === 'abs' && (
+                      <article className="card" id="sec-abs">
+                        <div className="card-h">
+                          <h2>Mes demandes d’absence</h2>
+                        </div>
+                        <form
+                          className="login-form"
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            void submitAbsence()
+                          }}
+                        >
+                          <label>
+                            Séance
+                            <select
+                              value={absScheduleId}
+                              onChange={(e) => setAbsScheduleId(e.target.value)}
+                              required
+                            >
+                              <option value="">Choisir une séance</option>
+                              {schedules.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.affectation.subject.name} · {formatDate(s.session_date)} ·{' '}
+                                  {formatTime(s.start_time)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            Motif
+                            <textarea
+                              className="textarea"
+                              value={absReason}
+                              onChange={(e) => setAbsReason(e.target.value)}
+                              required
+                            />
+                          </label>
+                          <button className="btn btn-accent" type="submit">
+                            Déclarer
+                          </button>
+                        </form>
+                        <LoadState
+                          loading={loading}
+                          empty={absences.length === 0}
+                          emptyText="Aucune demande d’absence."
+                        >
+                          {absences.map((a) => (
+                            <div className="spark-item" key={a.id}>
+                              <div className="spark-item-copy">
+                                <h4>
+                                  {a.schedule.affectation.subject.name} · {formatDate(a.created_at)}
+                                </h4>
+                                <p>{a.reason}</p>
+                                {a.review_comment && <p>Réponse : {a.review_comment}</p>}
+                                <AbsenceStatusChip status={a.status} />
+                              </div>
+                              {a.status === 'EN_ATTENTE' && (
+                                <label className="btn btn-ghost">
+                                  Justificatif
+                                  <input
+                                    type="file"
+                                    accept="application/pdf,image/jpeg,image/png,image/jpg"
+                                    hidden
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0]
+                                      if (file) void uploadJustificatif(a.id, file)
+                                    }}
+                                  />
+                                </label>
+                              )}
                             </div>
-                          )
-                        })}
+                          ))}
+                        </LoadState>
                       </article>
                     )}
                   </div>
@@ -554,6 +597,8 @@ export function StudentDashboard() {
                         ) : (
                           <p className="nx-muted">Aucune correspondance proposée pour vos objets.</p>
                         )}
+                        <h2 style={{ marginTop: 16, fontSize: 14 }}>Nouvelle déclaration</h2>
+                        <LostFoundForm onCreated={load} />
                       </article>
                     )}
 
@@ -563,29 +608,22 @@ export function StudentDashboard() {
                           <h2>Actions rapides</h2>
                         </div>
                         <div className="nx-quick-stack">
-                          <button className="quick" type="button" onClick={declareAbsence}>
+                          <button className="quick" type="button" onClick={() => go('abs')}>
                             <span className="icon-wrap danger">
                               <Icons.alert size={15} />
                             </span>
                             <span>
                               <strong>Déclarer une absence</strong>
-                              <span>Liée à votre prochaine séance</span>
+                              <span>Formulaire séance + motif</span>
                             </span>
                           </button>
-                          <button
-                            className="quick"
-                            type="button"
-                            onClick={() => {
-                              go('lost')
-                              declareLost()
-                            }}
-                          >
+                          <button className="quick" type="button" onClick={() => go('lost')}>
                             <span className="icon-wrap warning">
                               <Icons.search size={15} />
                             </span>
                             <span>
                               <strong>Signaler un objet perdu</strong>
-                              <span>Déclarer un objet pour lancer l’IA</span>
+                              <span>Formulaire + photo</span>
                             </span>
                           </button>
                         </div>

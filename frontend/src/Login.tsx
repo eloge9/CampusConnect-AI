@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from './api'
 import { homeForRole, useAuth } from './auth'
 import { Icons } from './icons'
@@ -15,14 +15,14 @@ export function LoginPage() {
   const { user, loading, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const locState = location.state as { from?: string; registered?: boolean; expired?: boolean } | null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   if (!loading && user) {
-    const from = (location.state as { from?: string } | null)?.from
-    return <Navigate to={from || homeForRole(user.role)} replace />
+    return <Navigate to={locState?.from || homeForRole(user.role)} replace />
   }
 
   const onSubmit = async (e: FormEvent) => {
@@ -42,13 +42,16 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card card">
-        <div className="login-brand">
-          <LogoMark size={40} />
-          <div>
-            <strong>CampusConnect AI</strong>
-            <p>Connexion à l’espace campus</p>
-          </div>
+        <div className="login-brand login-brand-logo">
+          <LogoMark size={72} />
+          <p>Connexion à l’espace campus</p>
         </div>
+        {locState?.registered && (
+          <p className="login-success">Compte créé. Connectez-vous avec votre e-mail et mot de passe.</p>
+        )}
+        {locState?.expired && (
+          <p className="login-error">Session expirée. Veuillez vous reconnecter.</p>
+        )}
         <form className="login-form" onSubmit={onSubmit}>
           <label>
             E-mail
@@ -75,23 +78,30 @@ export function LoginPage() {
             {busy ? 'Connexion…' : 'Se connecter'}
           </button>
         </form>
-        <p className="login-hint">Comptes de démonstration</p>
-        <div className="login-demos">
-          {DEMOS.map((d) => (
-            <button
-              key={d.email}
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => {
-                setEmail(d.email)
-                setPassword(d.password)
-                setError(null)
-              }}
-            >
-              <Icons.user size={14} /> {d.role}
-            </button>
-          ))}
-        </div>
+        <p className="login-switch">
+          Pas encore de compte ? <Link to="/inscription">Créer un compte</Link>
+        </p>
+        {import.meta.env.DEV && (
+          <>
+            <p className="login-hint">Comptes de démonstration (dev uniquement)</p>
+            <div className="login-demos">
+              {DEMOS.map((d) => (
+                <button
+                  key={d.email}
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => {
+                    setEmail(d.email)
+                    setPassword(d.password)
+                    setError(null)
+                  }}
+                >
+                  <Icons.user size={14} /> {d.role}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

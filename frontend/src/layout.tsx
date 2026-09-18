@@ -3,6 +3,7 @@ import { fullName, initials } from './api'
 import { useAuth } from './auth'
 import { Icons } from './icons'
 import { LogoMark } from './LogoMark'
+import { useTheme } from './theme'
 import { useUi } from './ui'
 
 export type Role = 'student' | 'teacher' | 'admin'
@@ -21,7 +22,8 @@ export const NAV: Record<Role, NavItem[]> = {
     { id: 'dash', label: 'Tableau de bord', icon: 'layout' },
     { id: 'time', label: "Mon Emploi du Temps", icon: 'calendar', badge: { text: "Aujourd'hui", tone: 'info' } },
     { id: 'courses', label: 'Mes Cours & Notes', icon: 'book' },
-    { id: 'exams', label: 'Devoirs & Examens', icon: 'clipboard', badge: { text: '4', tone: 'info' } },
+    { id: 'exams', label: 'Devoirs & Examens', icon: 'clipboard' },
+    { id: 'abs', label: 'Mes absences', icon: 'file' },
     { id: 'msg', label: 'Messagerie & Groupes', icon: 'message' },
     { id: 'lost', label: 'Objets Trouvés', icon: 'bag', badge: { text: 'Alerte', tone: 'warning' } },
     { id: 'ai', label: 'Assistant IA Campus', icon: 'spark', badge: { text: 'Nouveau', tone: 'info' } },
@@ -30,13 +32,20 @@ export const NAV: Record<Role, NavItem[]> = {
     { id: 'dash', label: 'Tableau de bord', icon: 'layout' },
     { id: 'agenda', label: 'Cours & Agenda', icon: 'calendar', badge: { text: '3 tâches', tone: 'info' } },
     { id: 'classes', label: 'Gestion des Classes', icon: 'users' },
-    { id: 'exams', label: 'Examens & Notes', icon: 'clipboard', badge: { text: '12 copies', tone: 'info' } },
+    { id: 'exams', label: 'Examens', icon: 'clipboard' },
+    { id: 'devoirs', label: 'Devoirs', icon: 'file' },
+    { id: 'abs', label: 'Absences à traiter', icon: 'alert' },
+    { id: 'msg', label: 'Messagerie', icon: 'message' },
     { id: 'admin', label: "Messages de l'Admin", icon: 'message' },
   ],
   admin: [
     { id: 'sup', label: 'Supervision IA & Systèmes', icon: 'activity' },
     { id: 'users', label: 'Comptes Utilisateurs', icon: 'users' },
-    { id: 'abs', label: 'Absences & Justificatifs', icon: 'file', badge: { text: '2 en attente', tone: 'warning' } },
+    { id: 'classes', label: 'Classes', icon: 'book' },
+    { id: 'matieres', label: 'Matières', icon: 'clipboard' },
+    { id: 'aff', label: 'Affectations', icon: 'users' },
+    { id: 'edt', label: 'Emploi du temps', icon: 'calendar' },
+    { id: 'abs', label: 'Absences & Justificatifs', icon: 'file' },
     { id: 'audit', label: 'Audit Trail', icon: 'shield' },
     { id: 'lost', label: 'Objets Perdus & Trouvés', icon: 'bag', badge: { text: '1 récemment', tone: 'info' } },
   ],
@@ -63,6 +72,7 @@ export function Shell({
 }) {
   const { toast } = useUi()
   const { user, logout } = useAuth()
+  const { theme, toggle } = useTheme()
   const items = NAV[role]
   const [section, setSection] = useState(items[0].id)
   const [query, setQuery] = useState('')
@@ -98,10 +108,7 @@ export function Shell({
     <div className={`dash ${role}`}>
       <aside className="sidebar">
         <div className="brand">
-          <LogoMark size={36} />
-          <div className="brand-copy">
-            <strong>CampusConnect AI</strong>
-          </div>
+          <LogoMark size={44} />
         </div>
         <nav className="nav">
           {items.map((item) => {
@@ -131,6 +138,9 @@ export function Shell({
                 {displayId}
               </div>
             )}
+            <button className="link logout-link" type="button" onClick={toggle}>
+              {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+            </button>
             <button className="link logout-link" type="button" onClick={logout}>
               Déconnexion
             </button>

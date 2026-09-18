@@ -4,13 +4,19 @@ import {
   formatDate,
   formatTime,
   formatWhen,
+  type Absence,
   type Announcement,
+  type Assignment,
   type ClassItem,
+  type Conversation,
   type Exam,
   type Schedule,
   type TeacherAssignment,
 } from './api'
 import { useAuth } from './auth'
+import { AbsenceActions } from './components/AbsenceActions'
+import { Inbox } from './components/Inbox'
+import { LoadState } from './components/LoadState'
 import { Icons } from './icons'
 import { Shell } from './layout'
 import { useUi } from './ui'
@@ -85,24 +91,47 @@ export function TeacherDashboard() {
   const [assignments, setAssignments] = useState<TeacherAssignment[]>([])
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [exams, setExams] = useState<Exam[]>([])
+  const [homework, setHomework] = useState<Assignment[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [absences, setAbsences] = useState<Absence[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [hwTitle, setHwTitle] = useState('')
+  const [hwDesc, setHwDesc] = useState('')
+  const [hwDue, setHwDue] = useState('')
+  const [hwAssign, setHwAssign] = useState('')
+  const [exTitle, setExTitle] = useState('')
+  const [exDesc, setExDesc] = useState('')
+  const [exRoom, setExRoom] = useState('')
+  const [exDate, setExDate] = useState('')
+  const [exStart, setExStart] = useState('08:00')
+  const [exEnd, setExEnd] = useState('10:00')
+  const [exAssign, setExAssign] = useState('')
 
   const load = useCallback(async () => {
     try {
-      const [cls, aff, seances, examens, anns] = await Promise.all([
+      const [cls, aff, seances, examens, anns, abs, convos, devoirs] = await Promise.all([
         api<ClassItem[]>('/classes'),
         api<TeacherAssignment[]>('/affectations-enseignants'),
         api<Schedule[]>('/emploi-du-temps'),
         api<Exam[]>('/examens'),
         api<Announcement[]>('/annonces'),
+        api<Absence[]>('/absences'),
+        api<Conversation[]>('/conversations'),
+        api<Assignment[]>('/devoirs'),
       ])
       setClasses(cls)
       setAssignments(aff)
       setSchedules(seances)
       setExams(examens)
       setAnnouncements(anns)
+      setAbsences(abs)
+      setConversations(convos)
+      setHomework(devoirs)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Chargement API impossible.')
+    } finally {
+      setLoading(false)
     }
   }, [toast])
 
@@ -309,20 +338,195 @@ export function TeacherDashboard() {
                   <h2>Examens</h2>
                   <span className="badge info">{exams.length}</span>
                 </div>
-                {exams.length === 0 && <p className="spark-lead">Aucun examen planifié.</p>}
-                {exams.map((item) => (
-                  <div className="spark-item" key={item.id}>
-                    <span className="icon-wrap accent">
-                      <Icons.clipboard size={15} />
-                    </span>
-                    <div className="spark-item-copy">
-                      <h4>{item.title}</h4>
-                      <p>
-                        {item.affectation.classe.name} · {formatDate(item.exam_date)} · {item.room}
-                      </p>
+                {loading && <p className="hint load-hint">Chargement en cours…</p>}
+                <form
+                  className="login-form"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void (async () => {
+                      try {
+                        await api('/examens', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            teacher_assignment_id: Number(exAssign),
+                            title: exTitle,
+                            description: exDesc || null,
+                            room: exRoom,
+                            exam_date: exDate,
+                            start_time: exStart.length === 5 ? `${exStart}:00` : exStart,
+                            end_time: exEnd.length === 5 ? `${exEnd}:00` : exEnd,
+                          }),
+                        })
+                        toast('Examen créé.')
+                        setExTitle('')
+                        await load()
+                      } catch (err) {
+                        toast(err instanceof Error ? err.message : 'Création impossible.')
+                      }
+                    })()
+                  }}
+                >
+                  <label>
+                    Affectation
+                    <select value={exAssign} onChange={(e) => setExAssign(e.target.value)} required>
+                      <option value="">Choisir</option>
+                      {assignments.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.subject.name} · {a.classe.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Titre
+                    <input value={exTitle} onChange={(e) => setExTitle(e.target.value)} required />
+                  </label>
+                  <label>
+                    Description
+                    <input value={exDesc} onChange={(e) => setExDesc(e.target.value)} />
+                  </label>
+                  <label>
+                    Salle
+                    <input value={exRoom} onChange={(e) => setExRoom(e.target.value)} required />
+                  </label>
+                  <label>
+                    Date
+                    <input type="date" value={exDate} onChange={(e) => setExDate(e.target.value)} required />
+                  </label>
+                  <label>
+                    Début
+                    <input type="time" value={exStart} onChange={(e) => setExStart(e.target.value)} required />
+                  </label>
+                  <label>
+                    Fin
+                    <input type="time" value={exEnd} onChange={(e) => setExEnd(e.target.value)} required />
+                  </label>
+                  <button className="btn btn-accent" type="submit">
+                    Créer l’examen
+                  </button>
+                </form>
+                <LoadState loading={loading} empty={exams.length === 0} emptyText="Aucun examen planifié.">
+                  {exams.map((item) => (
+                    <div className="spark-item" key={item.id}>
+                      <span className="icon-wrap accent">
+                        <Icons.clipboard size={15} />
+                      </span>
+                      <div className="spark-item-copy">
+                        <h4>{item.title}</h4>
+                        <p>
+                          {item.affectation.classe.name} · {formatDate(item.exam_date)} · {item.room}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </LoadState>
+              </article>
+            )}
+
+            {section === 'devoirs' && (
+              <article className="card" id="sec-devoirs">
+                <div className="card-h">
+                  <h2>Devoirs</h2>
+                </div>
+                <form
+                  className="login-form"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void (async () => {
+                      try {
+                        await api('/devoirs', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            teacher_assignment_id: Number(hwAssign),
+                            title: hwTitle,
+                            description: hwDesc || null,
+                            due_date: new Date(hwDue).toISOString(),
+                          }),
+                        })
+                        toast('Devoir créé.')
+                        setHwTitle('')
+                        await load()
+                      } catch (err) {
+                        toast(err instanceof Error ? err.message : 'Création impossible.')
+                      }
+                    })()
+                  }}
+                >
+                  <label>
+                    Affectation
+                    <select value={hwAssign} onChange={(e) => setHwAssign(e.target.value)} required>
+                      <option value="">Choisir</option>
+                      {assignments.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.subject.name} · {a.classe.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Titre
+                    <input value={hwTitle} onChange={(e) => setHwTitle(e.target.value)} required />
+                  </label>
+                  <label>
+                    Description
+                    <input value={hwDesc} onChange={(e) => setHwDesc(e.target.value)} />
+                  </label>
+                  <label>
+                    Date limite
+                    <input type="datetime-local" value={hwDue} onChange={(e) => setHwDue(e.target.value)} required />
+                  </label>
+                  <button className="btn btn-accent" type="submit">
+                    Créer le devoir
+                  </button>
+                </form>
+                <LoadState loading={loading} empty={homework.length === 0} emptyText="Aucun devoir.">
+                  {homework.map((d) => (
+                    <div className="spark-item" key={d.id}>
+                      <div className="spark-item-copy">
+                        <h4>{d.title}</h4>
+                        <p>
+                          {d.affectation.classe.name} · {formatWhen(d.due_date)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </LoadState>
+              </article>
+            )}
+
+            {section === 'abs' && (
+              <article className="card" id="sec-abs">
+                <div className="card-h">
+                  <h2>Absences à traiter</h2>
+                </div>
+                <LoadState
+                  loading={loading}
+                  empty={absences.length === 0}
+                  emptyText="Aucune demande d’absence."
+                >
+                  {absences.map((a) => (
+                    <div className="spark-item" key={a.id}>
+                      <div className="spark-item-copy">
+                        <h4>
+                          Étudiant #{a.student_id} · {a.schedule.affectation.subject.name}
+                        </h4>
+                        <p>{a.reason}</p>
+                      </div>
+                      <AbsenceActions absence={a} onDone={load} />
+                    </div>
+                  ))}
+                </LoadState>
+              </article>
+            )}
+
+            {section === 'msg' && (
+              <article className="card" id="sec-msg">
+                <div className="card-h">
+                  <h2>Messagerie</h2>
+                </div>
+                <LoadState loading={loading} empty={false}>
+                  <Inbox conversations={conversations} onRefresh={load} />
+                </LoadState>
               </article>
             )}
 
