@@ -37,6 +37,29 @@ def _get_subject(db: Session, subject_id: int) -> Subject:
     return subject
 
 
+def ensure_can_manage_for_assignment(current_user: User, assignment: TeacherAssignment) -> None:
+    """Réutilisé par les modules qui référencent teacher_assignment_id (emploi du temps, devoirs, examens)."""
+    if current_user.role == UserRole.ADMIN:
+        return
+    if current_user.role == UserRole.TEACHER and assignment.teacher_id == current_user.id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Vous ne pouvez gérer que les ressources liées à vos propres affectations.",
+    )
+
+
+def ensure_can_view_for_assignment(current_user: User, assignment: TeacherAssignment) -> None:
+    """Réutilisé par les modules qui référencent teacher_assignment_id (emploi du temps, devoirs, examens)."""
+    if current_user.role == UserRole.ADMIN:
+        return
+    if current_user.role == UserRole.TEACHER and assignment.teacher_id == current_user.id:
+        return
+    if current_user.role == UserRole.STUDENT and assignment.class_id == current_user.class_id:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous n'avez pas accès à cette ressource.")
+
+
 def get_assignment(db: Session, assignment_id: int) -> TeacherAssignment:
     assignment = db.query(TeacherAssignment).filter(TeacherAssignment.id == assignment_id).first()
     if assignment is None:

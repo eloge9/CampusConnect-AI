@@ -7,6 +7,10 @@ from app.models.schedule import Schedule, ScheduleStatus
 from app.models.teacher_assignment import TeacherAssignment
 from app.models.user import User, UserRole
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate
+from app.services.teacher_assignment_service import (
+    ensure_can_manage_for_assignment,
+    ensure_can_view_for_assignment,
+)
 
 FIELDS_TRIGGERING_MODIFIE = {"room", "session_date", "start_time", "end_time"}
 
@@ -20,17 +24,6 @@ def _get_assignment_or_404(db: Session, teacher_assignment_id: int) -> TeacherAs
     return assignment
 
 
-def _ensure_can_manage_assignment(current_user: User, assignment: TeacherAssignment) -> None:
-    if current_user.role == UserRole.ADMIN:
-        return
-    if current_user.role == UserRole.TEACHER and assignment.teacher_id == current_user.id:
-        return
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Vous ne pouvez gérer que les séances liées à vos propres affectations.",
-    )
-
-
 def get_schedule(db: Session, schedule_id: int) -> Schedule:
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
@@ -39,13 +32,7 @@ def get_schedule(db: Session, schedule_id: int) -> Schedule:
 
 
 def ensure_can_view_schedule(schedule: Schedule, current_user: User) -> None:
-    if current_user.role == UserRole.ADMIN:
-        return
-    if current_user.role == UserRole.TEACHER and schedule.affectation.teacher_id == current_user.id:
-        return
-    if current_user.role == UserRole.STUDENT and schedule.affectation.class_id == current_user.class_id:
-        return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous n'avez pas accès à cette séance.")
+    ensure_can_view_for_assignment(current_user, schedule.affectation)
 
 
 def list_schedules(
@@ -68,7 +55,7 @@ def list_schedules(
 
 def create_schedule(db: Session, data: ScheduleCreate, current_user: User) -> Schedule:
     assignment = _get_assignment_or_404(db, data.teacher_assignment_id)
-    _ensure_can_manage_assignment(current_user, assignment)
+    ensure_can_manage_for_assignment(current_user, assignment)
 
     schedule = Schedule(
         teacher_assignment_id=data.teacher_assignment_id,
@@ -87,7 +74,7 @@ def create_schedule(db: Session, data: ScheduleCreate, current_user: User) -> Sc
 
 def update_schedule(db: Session, schedule_id: int, data: ScheduleUpdate, current_user: User) -> Schedule:
     schedule = get_schedule(db, schedule_id)
-    _ensure_can_manage_assignment(current_user, schedule.affectation)
+    ensure_can_manage_for_assignment(current_user, schedule.affectation)
 
     updates = data.model_dump(exclude_unset=True)
     if FIELDS_TRIGGERING_MODIFIE.intersection(updates) and "status" not in updates:
@@ -103,6 +90,6 @@ def update_schedule(db: Session, schedule_id: int, data: ScheduleUpdate, current
 
 def delete_schedule(db: Session, schedule_id: int, current_user: User) -> None:
     schedule = get_schedule(db, schedule_id)
-    _ensure_can_manage_assignment(current_user, schedule.affectation)
+    ensure_can_manage_for_assignment(current_user, schedule.affectation)
     db.delete(schedule)
     db.commit()

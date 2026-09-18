@@ -148,7 +148,8 @@ Le détail exact des permissions par endpoint est visible dans `/docs` (chaque r
 | Affectations enseignants | `/affectations-enseignants` | ✅ |
 | Annonces | `/annonces` | ✅ (filtres `?categorie=`, `?classe_id=`, `?recherche=`) |
 | Emploi du temps | `/emploi-du-temps` | ✅ (filtres `?classe_id=`, `?date_seance=`) |
-| Devoirs / Examens | — | 🚧 en cours |
+| Devoirs | `/devoirs` | ✅ (filtres `?classe_id=`, `?matiere_id=`, `?a_venir=`) |
+| Examens | `/examens` | ✅ (filtres `?classe_id=`, `?matiere_id=`, `?a_venir=`) |
 | Absences | — | ⏳ à venir |
 | Objets perdus/trouvés + IA | — | ⏳ à venir |
 | Notifications | — | ⏳ à venir |

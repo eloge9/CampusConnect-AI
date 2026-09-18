@@ -4,6 +4,8 @@ from app.models.subject import Subject
 from app.models.teacher_assignment import TeacherAssignment
 from app.models.announcement import Announcement, AnnouncementCategory
 from app.models.schedule import Schedule, ScheduleStatus
+from app.models.assignment import Assignment
+from app.models.exam import Exam
 
 __all__ = [
     "User",
@@ -15,4 +17,6 @@ __all__ = [
     "AnnouncementCategory",
     "Schedule",
     "ScheduleStatus",
+    "Assignment",
+    "Exam",
 ]
