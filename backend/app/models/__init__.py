@@ -6,6 +6,7 @@ from app.models.announcement import Announcement, AnnouncementCategory
 from app.models.schedule import Schedule, ScheduleStatus
 from app.models.assignment import Assignment
 from app.models.exam import Exam
+from app.models.absence_request import AbsenceRequest, AbsenceStatus
 
 __all__ = [
     "User",
@@ -19,4 +20,6 @@ __all__ = [
     "ScheduleStatus",
     "Assignment",
     "Exam",
+    "AbsenceRequest",
+    "AbsenceStatus",
 ]

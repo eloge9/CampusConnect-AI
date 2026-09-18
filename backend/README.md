@@ -150,7 +150,7 @@ Le détail exact des permissions par endpoint est visible dans `/docs` (chaque r
 | Emploi du temps | `/emploi-du-temps` | ✅ (filtres `?classe_id=`, `?date_seance=`) |
 | Devoirs | `/devoirs` | ✅ (filtres `?classe_id=`, `?matiere_id=`, `?a_venir=`) |
 | Examens | `/examens` | ✅ (filtres `?classe_id=`, `?matiere_id=`, `?a_venir=`) |
-| Absences | — | ⏳ à venir |
+| Absences | `/absences` | ✅ (filtres `?statut=`, `?classe_id=` + upload justificatif via `POST /absences/{id}/justificatif`) |
 | Objets perdus/trouvés + IA | — | ⏳ à venir |
 | Notifications | — | ⏳ à venir |
 | Messagerie | — | ⏳ à venir |
@@ -165,11 +165,15 @@ Plutôt que d'appeler l'API "à la main", vous pouvez générer un client à par
 - **Web (TypeScript)** : [`openapi-typescript`](https://www.npmjs.com/package/openapi-typescript) ou [`orval`](https://orval.dev/) sur `http://localhost:8000/openapi.json`
 - **Mobile (Dart/Flutter)** : [`openapi-generator`](https://openapi-generator.tech/) avec le générateur `dart-dio`
 
-## 7. CORS
+## 7. Fichiers uploadés (justificatifs d'absence)
+
+`POST /absences/{id}/justificatif` accepte un fichier en `multipart/form-data` (champ `file`), formats acceptés : PDF/JPG/JPEG/PNG, 5 Mo max (configurable via `.env`). Le fichier est servi ensuite via l'URL relative renvoyée dans `justificatif_path` (ex: `/uploads/justificatifs/xxx.pdf`), à préfixer avec l'URL de base de l'API (`http://localhost:8000/uploads/justificatifs/xxx.pdf`).
+
+## 8. CORS
 
 Le CORS est activé (`app/main.py`), configurable via `CORS_ALLOWED_ORIGINS` dans `.env`. En développement il est ouvert à toutes les origines (`*`). Pensez à le restreindre à l'URL réelle du frontend avant toute mise en production.
 
-## 8. Erreurs — format standard
+## 9. Erreurs — format standard
 
 Toutes les erreurs suivent le format FastAPI standard :
 
@@ -179,7 +183,7 @@ Toutes les erreurs suivent le format FastAPI standard :
 
 Sauf les erreurs de validation (422) qui suivent le format Pydantic habituel avec une liste détaillée par champ.
 
-## 9. Tests
+## 10. Tests
 
 ```bash
 python -m pytest tests/ -v

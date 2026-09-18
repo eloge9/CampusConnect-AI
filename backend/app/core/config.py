@@ -20,6 +20,10 @@ class Settings(BaseSettings):
 
     cors_allowed_origins: str = "*"
 
+    upload_dir: str = "uploads"
+    max_upload_size_mb: int = 5
+    allowed_upload_extensions: str = "pdf,jpg,jpeg,png"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
