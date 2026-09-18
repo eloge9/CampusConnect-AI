@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { fullName, initials } from './api'
+import { useAuth } from './auth'
 import { Icons } from './icons'
 import { LogoMark } from './LogoMark'
 import { useUi } from './ui'
@@ -40,25 +42,10 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
 }
 
-const USERS: Record<Role, { name: string; role: string; id: string; initials: string }> = {
-  student: {
-    name: 'Alexandre Dubois',
-    role: 'L3 Informatique · Gr. A',
-    id: 'N° ÉTUDIANT : 22004815',
-    initials: 'AD',
-  },
-  teacher: {
-    name: 'Mme Christine Roche',
-    role: 'Enseignante en Informatique',
-    id: 'N° ENSEIGNANT : 384201',
-    initials: 'CR',
-  },
-  admin: {
-    name: 'Stéphane Duchêne',
-    role: 'Administrateur Système',
-    id: '',
-    initials: 'SD',
-  },
+const ROLE_LABEL: Record<Role, string> = {
+  student: 'Étudiant',
+  teacher: 'Enseignant',
+  admin: 'Administrateur',
 }
 
 export function Shell({
@@ -75,10 +62,14 @@ export function Shell({
   children: (ctx: { section: string; query: string; go: (id: string) => void }) => ReactNode
 }) {
   const { toast } = useUi()
+  const { user, logout } = useAuth()
   const items = NAV[role]
   const [section, setSection] = useState(items[0].id)
   const [query, setQuery] = useState('')
-  const user = USERS[role]
+  const displayName = user ? fullName(user) : ROLE_LABEL[role]
+  const displayRole = user ? ROLE_LABEL[role] : ''
+  const displayId = user?.email ?? ''
+  const avatar = user ? initials(user) : 'CC'
 
   useEffect(() => {
     setSection(NAV[role][0].id)
@@ -130,16 +121,19 @@ export function Shell({
           })}
         </nav>
         <div className="user-card">
-          <div className="avatar fallback">{user.initials}</div>
+          <div className="avatar fallback">{avatar}</div>
           <div className="meta">
-            <strong>{user.name}</strong>
-            <p>{user.role}</p>
-            {user.id && (
+            <strong>{displayName}</strong>
+            <p>{displayRole}</p>
+            {displayId && (
               <div className="user-id">
                 <Icons.id size={12} />
-                {user.id}
+                {displayId}
               </div>
             )}
+            <button className="link logout-link" type="button" onClick={logout}>
+              Déconnexion
+            </button>
           </div>
         </div>
       </aside>

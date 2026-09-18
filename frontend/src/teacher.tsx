@@ -1,45 +1,43 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  api,
+  formatDate,
+  formatTime,
+  formatWhen,
+  type Announcement,
+  type ClassItem,
+  type Exam,
+  type Schedule,
+  type TeacherAssignment,
+} from './api'
+import { useAuth } from './auth'
 import { Icons } from './icons'
 import { Shell } from './layout'
 import { useUi } from './ui'
 
-const CLASSES: [string, string][] = [
-  ['L3 Informatique · Gr. A', '96.2%'],
-  ['L3 Informatique · Gr. B', '94.8%'],
-  ['M1 IA & Datascience', '89.4%'],
-]
-
-/** Effectifs mock — brancher plus tard sur le SI scolarité. */
-const totalStudents = 108
-
-function Assistant({
-  greeting,
-  suggestions,
-}: {
-  greeting: string
-  suggestions: string[]
-}) {
+function Assistant({ greeting }: { greeting: string }) {
   const [input, setInput] = useState('')
   const [thread, setThread] = useState<{ from: 'ai' | 'me'; text: string }[]>([
     { from: 'ai', text: greeting },
   ])
 
-  const ask = (text: string) => {
+  const ask = async (text: string) => {
     const q = text.trim()
     if (!q) return
-    const lower = q.toLowerCase()
-    let answer =
-      'Je m’appuie sur vos cours CampusConnect pour répondre. Précisez une matière ou une salle si besoin.'
-    if (lower.includes('compilation') || lower.includes('analyseur')) {
-      answer =
-        'Fiche Compilation : tokens, analyse lexicale, grammaire LL. Le rendu Analyseur Lexical est attendu demain 23:59.'
-    } else if (lower.includes('salle') || lower.includes('classe')) {
-      answer = 'Prochain cours : Amphi Alan Turing (Bâtiment C, 2e étage), 10:00 – 11:30.'
-    } else if (lower.includes('copie') || lower.includes('note')) {
-      answer = 'Dernière note indexée : Projet Graphes 17/20. 12 copies restent à évaluer.'
-    }
-    setThread((t) => [...t, { from: 'me', text: q }, { from: 'ai', text: answer }])
+    setThread((t) => [...t, { from: 'me', text: q }])
     setInput('')
+    try {
+      const res = await api<{ answer: string }>('/assistant/question', {
+        method: 'POST',
+        body: JSON.stringify({ question: q }),
+      })
+      setThread((t) => [...t, { from: 'ai', text: res.answer }])
+    } catch (err) {
+      setThread((t) => [
+        ...t,
+        { from: 'ai', text: err instanceof Error ? err.message : 'Assistant indisponible.' },
+      ])
+    }
   }
 
   return (
@@ -49,7 +47,7 @@ function Assistant({
           <Icons.spark size={16} /> Assistant IA Enseignant
         </h2>
         <span className="chip success">
-          <span className="dot" /> EN LIGNE
+          <span className="dot" /> API
         </span>
       </div>
       <div className="ai-thread">
@@ -59,16 +57,11 @@ function Assistant({
           </div>
         ))}
       </div>
-      {suggestions.map((s) => (
-        <button className="suggest" type="button" key={s} onClick={() => ask(s)}>
-          {s}
-        </button>
-      ))}
       <form
         className="ai-input"
         onSubmit={(e) => {
           e.preventDefault()
-          ask(input)
+          void ask(input)
         }}
       >
         <input
@@ -84,34 +77,60 @@ function Assistant({
   )
 }
 
-function ClassBars({ items }: { items: [string, string][] }) {
-  return (
-    <>
-      {items.map(([name, pct]) => (
-        <div className="spark-progress" key={name}>
-          <div className="spark-progress-lab">
-            <strong>{name}</strong>
-            <span>
-              Présence <b>{pct}</b>
-            </span>
-          </div>
-          <div className="track">
-            <div className="fill" style={{ width: pct }} />
-          </div>
-        </div>
-      ))}
-    </>
-  )
-}
-
 export function TeacherDashboard() {
+  const { user } = useAuth()
   const { modal, toast } = useUi()
-  const [moved, setMoved] = useState(false)
-  const [roomFlagged, setRoomFlagged] = useState(false)
-  const [announce, setAnnounce] = useState(
-    "Rappel à tous, les notes du projet d’architecture ont été publiées sur votre espace. Vous pouvez consulter les détails.",
-  )
-  const [published, setPublished] = useState(false)
+  const [announce, setAnnounce] = useState('')
+  const [classes, setClasses] = useState<ClassItem[]>([])
+  const [assignments, setAssignments] = useState<TeacherAssignment[]>([])
+  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [exams, setExams] = useState<Exam[]>([])
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+
+  const load = useCallback(async () => {
+    try {
+      const [cls, aff, seances, examens, anns] = await Promise.all([
+        api<ClassItem[]>('/classes'),
+        api<TeacherAssignment[]>('/affectations-enseignants'),
+        api<Schedule[]>('/emploi-du-temps'),
+        api<Exam[]>('/examens'),
+        api<Announcement[]>('/annonces'),
+      ])
+      setClasses(cls)
+      setAssignments(aff)
+      setSchedules(seances)
+      setExams(examens)
+      setAnnouncements(anns)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Chargement API impossible.')
+    }
+  }, [toast])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const publish = async () => {
+    if (!announce.trim()) {
+      toast('Le message ne peut pas être vide.')
+      return
+    }
+    try {
+      await api('/annonces', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: announce.trim().slice(0, 80),
+          content: announce.trim(),
+          category: 'ADMINISTRATION',
+        }),
+      })
+      setAnnounce('')
+      toast('Annonce publiée.')
+      await load()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Publication impossible.')
+    }
+  }
 
   return (
     <Shell
@@ -121,8 +140,8 @@ export function TeacherDashboard() {
         <div className="top-meta">
           <span className="chip success">Espace Enseignant Actif</span>
           <div className="date-block">
-            <strong>Mardi 15 Avril 2025</strong>
-            <span>Espace Enseignant · Semestre 2</span>
+            <strong>{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full' }).format(new Date())}</strong>
+            <span>Connecté à l’API</span>
           </div>
         </div>
       }
@@ -130,6 +149,7 @@ export function TeacherDashboard() {
       {({ section, query }) => {
         const q = query.trim().toLowerCase()
         const match = (text: string) => !q || text.toLowerCase().includes(q)
+        const classList = classes.filter((c) => match(c.name + c.code))
 
         return (
           <div className="spark-page">
@@ -138,20 +158,20 @@ export function TeacherDashboard() {
                 {section === 'dash' && (
                   <>
                     <header className="spark-header" id="sec-dash">
-                      <h1>Espace Pédagogique — Bonjour Christine Roche !</h1>
+                      <h1>Espace Pédagogique — Bonjour {user?.first_name} !</h1>
                     </header>
                     <div className="spark-stats">
                       <article className="card spark-stat">
-                        <span className="stat-label">Moyenne générale</span>
-                        <strong className="stat-value">15.4/20</strong>
+                        <span className="stat-label">Classes</span>
+                        <strong className="stat-value">{classes.length}</strong>
                       </article>
                       <article className="card spark-stat">
-                        <span className="stat-label">Étudiants inscrits</span>
-                        <strong className="stat-value">{totalStudents}</strong>
+                        <span className="stat-label">Affectations</span>
+                        <strong className="stat-value">{assignments.length}</strong>
                       </article>
                       <article className="card spark-stat">
-                        <span className="stat-label">Présence moyenne</span>
-                        <strong className="stat-value success">94%</strong>
+                        <span className="stat-label">Séances</span>
+                        <strong className="stat-value success">{schedules.length}</strong>
                       </article>
                     </div>
                   </>
@@ -162,96 +182,60 @@ export function TeacherDashboard() {
                     <article className="card" id="sec-agenda">
                       <div className="card-h">
                         <h2>Gestion des Cours & Changements d’Emploi du Temps</h2>
-                        <button
-                          className="link"
-                          type="button"
-                          onClick={() =>
-                            modal({
-                              title: 'Historique des aménagements',
-                              body: (
-                                <ul className="modal-list">
-                                  <li>12 Avril — CM Compilation déplacé (salle Turing)</li>
-                                  <li>03 Avril — TD Graphes avancé d’une heure</li>
-                                </ul>
-                              ),
-                            })
-                          }
-                        >
-                          Historique des aménagements →
-                        </button>
                       </div>
-                      {match('Théorie des Langages Compilation') && (
-                        <div className="spark-item">
-                          <span className="icon-wrap warning">
-                            <Icons.clock size={15} />
-                          </span>
-                          <div className="spark-item-copy">
-                            <h4>Déplacer le Cours : Théorie des Langages & Compilation</h4>
-                            <p>
-                              {moved
-                                ? 'Nouveau créneau : Vendredi 14h00 · Amphithéâtre Turing'
-                                : 'L3 Informatique · Gr. A · CM · Amphithéâtre Turing'}
-                            </p>
+                      {schedules.filter((s) => match(s.affectation.subject.name + s.room)).length ===
+                        0 && <p className="spark-lead">Aucune séance pour l’instant.</p>}
+                      {schedules
+                        .filter((s) => match(s.affectation.subject.name + s.room))
+                        .slice(0, 6)
+                        .map((s) => (
+                          <div className="spark-item" key={s.id}>
+                            <span className="icon-wrap warning">
+                              <Icons.clock size={15} />
+                            </span>
+                            <div className="spark-item-copy">
+                              <h4>
+                                {s.affectation.subject.name} · {s.affectation.classe.name}
+                              </h4>
+                              <p>
+                                {formatDate(s.session_date)} · {formatTime(s.start_time)}–{formatTime(s.end_time)} ·{' '}
+                                {s.room} · {s.status}
+                              </p>
+                            </div>
+                            <button
+                              className="btn cta btn-soft-warning"
+                              type="button"
+                              disabled={s.status === 'ANNULE'}
+                              onClick={() =>
+                                modal({
+                                  title: 'Marquer la séance comme modifiée',
+                                  body: (
+                                    <p>
+                                      Les étudiants concernés recevront une notification de changement
+                                      de séance.
+                                    </p>
+                                  ),
+                                  confirm: 'Confirmer',
+                                  onConfirm: () => {
+                                    void api(`/emploi-du-temps/${s.id}`, {
+                                      method: 'PUT',
+                                      body: JSON.stringify({ status: 'MODIFIE' }),
+                                    })
+                                      .then(() => {
+                                        toast('Séance marquée comme modifiée.')
+                                        return load()
+                                      })
+                                      .catch((err) =>
+                                        toast(err instanceof Error ? err.message : 'Action impossible.'),
+                                      )
+                                  },
+                                })
+                              }
+                            >
+                              Signaler un changement
+                            </button>
                           </div>
-                          <button
-                            className={`btn cta ${moved ? 'btn-soft-success' : 'btn-accent'}`}
-                            type="button"
-                            disabled={moved}
-                            onClick={() =>
-                              modal({
-                                title: 'Confirmer le déplacement',
-                                body: (
-                                  <p>
-                                    Le CM Théorie des Langages & Compilation sera déplacé au vendredi
-                                    14h00. Les étudiants du Gr. A seront notifiés.
-                                  </p>
-                                ),
-                                confirm: 'Confirmer',
-                                onConfirm: () => {
-                                  setMoved(true)
-                                  toast('Cours déplacé au vendredi 14h00. Notification envoyée.')
-                                },
-                              })
-                            }
-                          >
-                            {moved ? 'Cours déplacé' : 'Déplacer au Vendredi 14h00'}
-                          </button>
-                        </div>
-                      )}
-                      {match('Changement de Salle Turing') && (
-                        <div className="spark-item">
-                          <span className="icon-wrap warning">
-                            <Icons.alert size={15} />
-                          </span>
-                          <div className="spark-item-copy">
-                            <h4>Signaler un Changement de Salle Exceptionnel</h4>
-                            <p>Salle Turing saturée, besoin d’une plus grande</p>
-                          </div>
-                          <button
-                            className={`btn cta ${roomFlagged ? 'btn-soft-success' : 'btn-soft-warning'}`}
-                            type="button"
-                            disabled={roomFlagged}
-                            onClick={() =>
-                              modal({
-                                title: 'Signaler la salle 302',
-                                body: (
-                                  <p>
-                                    Un changement exceptionnel vers la salle 302 sera transmis à
-                                    l’administration et aux étudiants.
-                                  </p>
-                                ),
-                                confirm: 'Signaler',
-                                onConfirm: () => {
-                                  setRoomFlagged(true)
-                                  toast('Changement de salle 302 signalé.')
-                                },
-                              })
-                            }
-                          >
-                            {roomFlagged ? 'Salle 302 signalée' : 'Signaler (salle 302)'}
-                          </button>
-                        </div>
-                      )}
+                        ))}
                     </article>
 
                     {section === 'dash' && (
@@ -263,25 +247,11 @@ export function TeacherDashboard() {
                         <textarea
                           className="textarea"
                           value={announce}
-                          onChange={(e) => {
-                            setAnnounce(e.target.value)
-                            setPublished(false)
-                          }}
+                          onChange={(e) => setAnnounce(e.target.value)}
                         />
                         <div className="spark-actions">
-                          <button
-                            className={`btn ${published ? 'btn-soft-success' : 'btn-accent'}`}
-                            type="button"
-                            onClick={() => {
-                              if (!announce.trim()) {
-                                toast('Le message ne peut pas être vide.')
-                                return
-                              }
-                              setPublished(true)
-                              toast('Annonce campus publiée.')
-                            }}
-                          >
-                            {published ? 'Annonce publiée' : 'Publier l’Annonce Campus'}
+                          <button className="btn btn-accent" type="button" onClick={() => void publish()}>
+                            Publier l’Annonce Campus
                           </button>
                         </div>
                       </article>
@@ -291,18 +261,25 @@ export function TeacherDashboard() {
                   <div className="spark-side">
                     {section === 'dash' && (
                       <Assistant
-                        greeting="Bonjour Mme Roche, j’ai analysé les résultats du dernier examen de Compilation : 85% de la classe a réussi. Voulez-vous que je génère un exercice ciblé ?"
-                        suggestions={[
-                          'Générer un exercice de rattrapage « Analyseur Syntaxique »',
-                          'Extraire un extrait de tes 3 meilleurs copies à fêter',
-                        ]}
+                        greeting={`Bonjour ${user?.first_name ?? ''}, je m’appuie sur les données réelles de la plateforme.`}
                       />
                     )}
                     <article className="card" id="sec-classes">
                       <div className="card-h">
                         <h2>Aperçu des Classes</h2>
                       </div>
-                      <ClassBars items={CLASSES.filter(([name]) => match(name))} />
+                      {classList.length === 0 && <p className="spark-lead">Aucune classe en base.</p>}
+                      {classList.map((c) => (
+                        <div className="spark-progress" key={c.id}>
+                          <div className="spark-progress-lab">
+                            <strong>{c.name}</strong>
+                            <span>{c.code}</span>
+                          </div>
+                          <div className="track">
+                            <div className="fill" style={{ width: '100%' }} />
+                          </div>
+                        </div>
+                      ))}
                     </article>
                   </div>
                 </div>
@@ -314,35 +291,36 @@ export function TeacherDashboard() {
                 <div className="card-h">
                   <h2>Gestion des Classes</h2>
                 </div>
-                <ClassBars items={CLASSES} />
+                {classes.map((c) => (
+                  <div className="spark-progress" key={c.id}>
+                    <div className="spark-progress-lab">
+                      <strong>{c.name}</strong>
+                      <span>{c.code}</span>
+                    </div>
+                    <p className="spark-lead">{c.description || 'Pas de description.'}</p>
+                  </div>
+                ))}
               </article>
             )}
 
             {section === 'exams' && (
               <article className="card" id="sec-exams">
                 <div className="card-h">
-                  <h2>Examens & Notes</h2>
-                  <span className="badge info">12 copies</span>
+                  <h2>Examens</h2>
+                  <span className="badge info">{exams.length}</span>
                 </div>
-                <p className="spark-lead">
-                  Copies en attente d’évaluation — Compilation et bases de données.
-                </p>
-                {['Analyseur Lexical', 'NoSQL — contrôle Moodle', 'Requêtes Réseau'].map((item) => (
-                  <div className="spark-item" key={item}>
+                {exams.length === 0 && <p className="spark-lead">Aucun examen planifié.</p>}
+                {exams.map((item) => (
+                  <div className="spark-item" key={item.id}>
                     <span className="icon-wrap accent">
                       <Icons.clipboard size={15} />
                     </span>
                     <div className="spark-item-copy">
-                      <h4>{item}</h4>
-                      <p>À corriger</p>
+                      <h4>{item.title}</h4>
+                      <p>
+                        {item.affectation.classe.name} · {formatDate(item.exam_date)} · {item.room}
+                      </p>
                     </div>
-                    <button
-                      className="btn btn-accent"
-                      type="button"
-                      onClick={() => toast(`Ouverture du paquet : ${item}`)}
-                    >
-                      Ouvrir
-                    </button>
                   </div>
                 ))}
               </article>
@@ -351,19 +329,19 @@ export function TeacherDashboard() {
             {section === 'admin' && (
               <article className="card" id="sec-admin">
                 <div className="card-h">
-                  <h2>Messages de l’Admin</h2>
+                  <h2>Annonces campus</h2>
                 </div>
-                <div className="ann">
-                  <div className="kicker">
-                    <span>ADMINISTRATION</span>
-                    <span>Hier à 14:30</span>
+                {announcements.length === 0 && <p className="spark-lead">Aucune annonce.</p>}
+                {announcements.slice(0, 8).map((a) => (
+                  <div className="ann" key={a.id}>
+                    <div className="kicker">
+                      <span>{a.category}</span>
+                      <span>{formatWhen(a.created_at)}</span>
+                    </div>
+                    <h4>{a.title}</h4>
+                    <p>{a.content}</p>
                   </div>
-                  <h4>Campagne d’évaluation des enseignements du second semestre ouverte</h4>
-                  <p>Merci de relayer l’information à vos groupes.</p>
-                </div>
-                <button className="btn btn-accent" type="button" onClick={() => toast('Message marqué comme lu.')}>
-                  Marquer comme lu
-                </button>
+                ))}
               </article>
             )}
           </div>
