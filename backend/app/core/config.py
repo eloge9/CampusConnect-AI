@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     seed_student_email: str = "etudiant@campusconnect.dev"
     seed_student_password: str = "StudentDemo123!"
 
+    cors_allowed_origins: str = "*"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
