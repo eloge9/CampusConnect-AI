@@ -6,6 +6,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.file_validation import detect_extension, is_extension_allowed
 from app.models.absence_request import AbsenceRequest, AbsenceStatus
 from app.models.notification import NotificationType
 from app.models.schedule import Schedule
@@ -173,14 +174,6 @@ async def upload_justificatif(
             detail="Impossible d'ajouter un justificatif à une demande déjà traitée.",
         )
 
-    extension = Path(file.filename or "").suffix.lower().lstrip(".")
-    allowed = {ext.strip().lower() for ext in settings.allowed_upload_extensions.split(",")}
-    if extension not in allowed:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Format de fichier non autorisé. Formats acceptés : {', '.join(sorted(allowed))}.",
-        )
-
     content = await file.read()
     max_size = settings.max_upload_size_mb * 1024 * 1024
     if len(content) > max_size:
@@ -189,9 +182,20 @@ async def upload_justificatif(
             detail=f"Fichier trop volumineux (max {settings.max_upload_size_mb} Mo).",
         )
 
+    allowed = {ext.strip().lower() for ext in settings.allowed_upload_extensions.split(",")}
+    detected_extension = detect_extension(content)
+    if detected_extension is None or not is_extension_allowed(detected_extension, allowed):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Fichier non reconnu ou format non autorisé (vérifié par contenu, pas par nom "
+                f"de fichier). Formats acceptés : {', '.join(sorted(allowed))}."
+            ),
+        )
+
     upload_dir = Path(settings.upload_dir) / "justificatifs"
     upload_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}.{extension}"
+    filename = f"{uuid.uuid4().hex}.{detected_extension}"
     (upload_dir / filename).write_bytes(content)
 
     absence.justificatif_path = f"/uploads/justificatifs/{filename}"

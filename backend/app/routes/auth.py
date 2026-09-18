@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
+from app.core.rate_limit import limiter
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse
@@ -12,12 +13,14 @@ router = APIRouter(prefix="/auth", tags=["Authentification"])
 
 
 @router.post("/inscription", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def inscription(user_in: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def inscription(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     return auth_service.create_user(db, user_in)
 
 
 @router.post("/connexion", response_model=TokenResponse)
-def connexion(credentials: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def connexion(request: Request, credentials: LoginRequest, db: Session = Depends(get_db)):
     user = auth_service.authenticate_user(db, credentials.email, credentials.password)
     return auth_service.build_token_response(user)
 

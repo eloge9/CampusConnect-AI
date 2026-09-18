@@ -4,6 +4,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.rate_limit import limiter
 from app.db.base import Base
 from app.db.database import get_db
 from app.main import app
@@ -26,6 +27,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture()
 def client():
+    limiter.reset()
     Base.metadata.create_all(bind=engine)
 
     def override_get_db():

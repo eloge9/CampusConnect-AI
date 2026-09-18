@@ -114,9 +114,10 @@ Authorization: Bearer <access_token>
 | `/auth/changer-mot-de-passe` | POST | `{"current_password": "...", "new_password": "..."}` |
 
 **Notes importantes :**
-- `/auth/inscription` crée toujours un compte `STUDENT`. Il n'existe pas encore de création de compte TEACHER/ADMIN via l'API (utiliser le script de seed en attendant le module Administration).
+- `/auth/inscription` crée toujours un compte `STUDENT`. Pour créer/promouvoir un TEACHER ou ADMIN : soit le script de seed (`python -m app.seed`), soit un ADMIN existant via `PUT /utilisateurs/{id}` (voir section Administration).
 - Pas de refresh token pour l'instant : quand le token expire (`ACCESS_TOKEN_EXPIRE_MINUTES`), l'utilisateur doit se reconnecter.
 - Le "logout" est purement côté client (supprimer le token stocké) — il n'y a pas d'invalidation serveur du token.
+- `/auth/connexion` et `/auth/inscription` sont limités à **5 tentatives par minute et par IP** (protection anti brute-force). Au-delà, l'API répond `429 {"detail": "Trop de tentatives. Réessayez plus tard."}`.
 
 ### Comptes de démonstration
 
@@ -177,6 +178,8 @@ Règle stricte du cahier des charges respectée : **le système ne déclare jama
 ## 8. Fichiers uploadés (justificatifs d'absence, photos d'objets)
 
 `POST /absences/{id}/justificatif` (PDF/JPG/JPEG/PNG) et `POST /objets-perdus-trouves/{id}/photo` (JPG/JPEG/PNG) acceptent un fichier en `multipart/form-data` (champ `file`), 5 Mo max (configurable via `.env`). Le fichier est servi ensuite via l'URL relative renvoyée (`photo_path`/`justificatif_path`, ex: `/uploads/objets/xxx.png`), à préfixer avec l'URL de base de l'API (`http://localhost:8000/uploads/objets/xxx.png`).
+
+⚠️ Le type de fichier est vérifié par le **contenu réel** (signature binaire / magic bytes dans `app/core/file_validation.py`), jamais par l'extension du nom de fichier fourni par le client — impossible de faire passer un fichier malveillant en renommant son extension. L'extension du fichier stocké est celle **détectée**, pas celle envoyée par le client.
 
 ## 9. Notifications
 

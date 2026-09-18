@@ -6,6 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.file_validation import detect_extension, is_extension_allowed
 from app.models.lost_found_item import ItemStatus, ItemType, LostFoundItem
 from app.models.user import User, UserRole
 from app.schemas.lost_found_item import LostFoundItemCreate, LostFoundItemUpdate
@@ -98,13 +99,6 @@ async def upload_photo(db: Session, item_id: int, file: UploadFile, current_user
     item = get_item(db, item_id)
     ensure_can_manage_item(item, current_user)
 
-    extension = Path(file.filename or "").suffix.lower().lstrip(".")
-    if extension not in IMAGE_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Format d'image non autorisé. Formats acceptés : {', '.join(sorted(IMAGE_EXTENSIONS))}.",
-        )
-
     content = await file.read()
     max_size = settings.max_upload_size_mb * 1024 * 1024
     if len(content) > max_size:
@@ -113,9 +107,19 @@ async def upload_photo(db: Session, item_id: int, file: UploadFile, current_user
             detail=f"Image trop volumineuse (max {settings.max_upload_size_mb} Mo).",
         )
 
+    detected_extension = detect_extension(content)
+    if detected_extension is None or not is_extension_allowed(detected_extension, IMAGE_EXTENSIONS):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Image non reconnue ou format non autorisé (vérifié par contenu, pas par nom "
+                f"de fichier). Formats acceptés : {', '.join(sorted(IMAGE_EXTENSIONS))}."
+            ),
+        )
+
     upload_dir = Path(settings.upload_dir) / "objets"
     upload_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}.{extension}"
+    filename = f"{uuid.uuid4().hex}.{detected_extension}"
     (upload_dir / filename).write_bytes(content)
 
     item.photo_path = f"/uploads/objets/{filename}"
