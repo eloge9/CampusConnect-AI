@@ -73,11 +73,6 @@ app.include_router(users.router)
 app.include_router(administration.router)
 
 
-@app.get("/")
-def root():
-    return {"status": "ok", "app": settings.app_name, "environment": settings.environment}
-
-
 @app.get("/sante")
 def sante():
     return {"status": "ok", "app": settings.app_name, "environment": settings.environment}
