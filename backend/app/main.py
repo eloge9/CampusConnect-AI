@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.core.config import settings
-from app.routes import announcements, auth, classes, subjects, teacher_assignments
+from app.routes import announcements, auth, classes, schedules, subjects, teacher_assignments
 
 app = FastAPI(title=settings.app_name)
 
@@ -10,6 +10,7 @@ app.include_router(classes.router)
 app.include_router(subjects.router)
 app.include_router(teacher_assignments.router)
 app.include_router(announcements.router)
+app.include_router(schedules.router)
 
 
 @app.get("/")
