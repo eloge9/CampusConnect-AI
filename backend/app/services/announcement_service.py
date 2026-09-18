@@ -3,9 +3,11 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.announcement import Announcement, AnnouncementCategory
+from app.models.notification import NotificationType
 from app.models.school_class import Class
 from app.models.user import User, UserRole
 from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate
+from app.services.notification_service import get_student_ids_for_class, notify_users
 from app.services.teacher_assignment_service import is_teacher_assigned_to_class
 
 
@@ -90,6 +92,18 @@ def create_announcement(db: Session, data: AnnouncementCreate, current_user: Use
     db.add(announcement)
     db.commit()
     db.refresh(announcement)
+
+    student_ids = get_student_ids_for_class(db, announcement.class_id)
+    notify_users(
+        db,
+        student_ids,
+        NotificationType.NOUVELLE_ANNONCE,
+        title=f"Nouvelle annonce : {announcement.title}",
+        message=announcement.content[:200],
+        reference_type="annonce",
+        reference_id=announcement.id,
+    )
+
     return announcement
 
 

@@ -4,9 +4,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.exam import Exam
+from app.models.notification import NotificationType
 from app.models.teacher_assignment import TeacherAssignment
 from app.models.user import User, UserRole
 from app.schemas.exam import ExamCreate, ExamUpdate
+from app.services.notification_service import get_student_ids_for_class, notify_users
 from app.services.teacher_assignment_service import (
     ensure_can_manage_for_assignment,
     ensure_can_view_for_assignment,
@@ -74,6 +76,18 @@ def create_exam(db: Session, data: ExamCreate, current_user: User) -> Exam:
     db.add(exam)
     db.commit()
     db.refresh(exam)
+
+    student_ids = get_student_ids_for_class(db, assignment.class_id)
+    notify_users(
+        db,
+        student_ids,
+        NotificationType.NOUVEL_EXAMEN,
+        title=f"Nouvel examen : {exam.title}",
+        message=f"{exam.title} le {exam.exam_date} en salle {exam.room}.",
+        reference_type="examen",
+        reference_id=exam.id,
+    )
+
     return exam
 
 

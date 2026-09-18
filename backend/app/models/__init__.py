@@ -9,6 +9,7 @@ from app.models.exam import Exam
 from app.models.absence_request import AbsenceRequest, AbsenceStatus
 from app.models.lost_found_item import ItemStatus, ItemType, LostFoundItem
 from app.models.potential_match import MatchStatus, PotentialMatch
+from app.models.notification import Notification, NotificationType
 
 __all__ = [
     "User",
@@ -29,4 +30,6 @@ __all__ = [
     "ItemStatus",
     "PotentialMatch",
     "MatchStatus",
+    "Notification",
+    "NotificationType",
 ]

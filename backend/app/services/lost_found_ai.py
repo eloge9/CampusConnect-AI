@@ -3,7 +3,9 @@ from difflib import SequenceMatcher
 from sqlalchemy.orm import Session
 
 from app.models.lost_found_item import ItemStatus, ItemType, LostFoundItem
+from app.models.notification import NotificationType
 from app.models.potential_match import PotentialMatch
+from app.services.notification_service import notify_users
 
 MATCH_THRESHOLD = 0.45
 DATE_DECAY_DAYS = 14
@@ -89,5 +91,14 @@ def generate_matches_for_item(db: Session, item: LostFoundItem) -> list[Potentia
         db.commit()
         for match in created_matches:
             db.refresh(match)
+            notify_users(
+                db,
+                [match.lost_item.user_id, match.found_item.user_id],
+                NotificationType.CORRESPONDANCE_OBJET,
+                title="Correspondance potentielle détectée",
+                message="Une correspondance potentielle a été détectée pour un de vos objets déclarés.",
+                reference_type="correspondance",
+                reference_id=match.id,
+            )
 
     return created_matches

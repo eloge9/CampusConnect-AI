@@ -3,10 +3,12 @@ from datetime import date
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.notification import NotificationType
 from app.models.schedule import Schedule, ScheduleStatus
 from app.models.teacher_assignment import TeacherAssignment
 from app.models.user import User, UserRole
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate
+from app.services.notification_service import get_student_ids_for_class, notify_users
 from app.services.teacher_assignment_service import (
     ensure_can_manage_for_assignment,
     ensure_can_view_for_assignment,
@@ -76,6 +78,9 @@ def update_schedule(db: Session, schedule_id: int, data: ScheduleUpdate, current
     schedule = get_schedule(db, schedule_id)
     ensure_can_manage_for_assignment(current_user, schedule.affectation)
 
+    old_room, old_date = schedule.room, schedule.session_date
+    old_start, old_end = schedule.start_time, schedule.end_time
+
     updates = data.model_dump(exclude_unset=True)
     if FIELDS_TRIGGERING_MODIFIE.intersection(updates) and "status" not in updates:
         updates["status"] = ScheduleStatus.MODIFIE
@@ -85,6 +90,36 @@ def update_schedule(db: Session, schedule_id: int, data: ScheduleUpdate, current
 
     db.commit()
     db.refresh(schedule)
+
+    if schedule.status in (ScheduleStatus.MODIFIE, ScheduleStatus.ANNULE):
+        if schedule.status == ScheduleStatus.ANNULE:
+            message = "Cette séance a été annulée."
+        else:
+            changes = []
+            if schedule.room != old_room:
+                changes.append(f"salle {old_room} → {schedule.room}")
+            if (schedule.session_date, schedule.start_time, schedule.end_time) != (
+                old_date,
+                old_start,
+                old_end,
+            ):
+                changes.append(
+                    f"horaire {old_date} {old_start}-{old_end} → "
+                    f"{schedule.session_date} {schedule.start_time}-{schedule.end_time}"
+                )
+            message = "; ".join(changes) if changes else "Cette séance a été mise à jour."
+
+        student_ids = get_student_ids_for_class(db, schedule.affectation.class_id)
+        notify_users(
+            db,
+            student_ids,
+            NotificationType.CHANGEMENT_SEANCE,
+            title="Changement d'emploi du temps",
+            message=message,
+            reference_type="seance",
+            reference_id=schedule.id,
+        )
+
     return schedule
 
 

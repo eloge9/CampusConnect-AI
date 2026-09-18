@@ -7,10 +7,17 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.absence_request import AbsenceRequest, AbsenceStatus
+from app.models.notification import NotificationType
 from app.models.schedule import Schedule
 from app.models.teacher_assignment import TeacherAssignment
 from app.models.user import User, UserRole
 from app.schemas.absence_request import AbsenceRequestCreate, AbsenceRequestUpdate
+from app.services.notification_service import notify_users
+
+ABSENCE_STATUS_LABELS = {
+    AbsenceStatus.ACCEPTEE: "acceptée",
+    AbsenceStatus.REFUSEE: "refusée",
+}
 
 
 def _get_schedule_or_404(db: Session, schedule_id: int) -> Schedule:
@@ -121,6 +128,18 @@ def update_absence_request(
 
     db.commit()
     db.refresh(absence)
+
+    if "status" in updates and absence.status in ABSENCE_STATUS_LABELS:
+        notify_users(
+            db,
+            [absence.student_id],
+            NotificationType.REPONSE_ABSENCE,
+            title="Réponse à votre demande d'absence",
+            message=f"Votre demande d'absence a été {ABSENCE_STATUS_LABELS[absence.status]}.",
+            reference_type="absence",
+            reference_id=absence.id,
+        )
+
     return absence
 
 

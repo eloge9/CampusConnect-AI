@@ -153,7 +153,7 @@ Le détail exact des permissions par endpoint est visible dans `/docs` (chaque r
 | Absences | `/absences` | ✅ (filtres `?statut=`, `?classe_id=` + upload justificatif via `POST /absences/{id}/justificatif`) |
 | Objets perdus/trouvés | `/objets-perdus-trouves` | ✅ (filtres `?type=`, `?statut=`, `?categorie=`, `?recherche=` + upload photo) |
 | Correspondance IA | `/correspondances` | ✅ (générée automatiquement à la création d'un objet, voir note IA ci-dessous) |
-| Notifications | — | ⏳ à venir |
+| Notifications | `/notifications` | ✅ (filtre `?non_lues=true`, `POST /{id}/lire`, `POST /lire-tout` — voir note ci-dessous) |
 | Messagerie | — | ⏳ à venir |
 | Assistant IA | — | ⏳ à venir |
 
@@ -176,11 +176,27 @@ Règle stricte du cahier des charges respectée : **le système ne déclare jama
 
 `POST /absences/{id}/justificatif` (PDF/JPG/JPEG/PNG) et `POST /objets-perdus-trouves/{id}/photo` (JPG/JPEG/PNG) acceptent un fichier en `multipart/form-data` (champ `file`), 5 Mo max (configurable via `.env`). Le fichier est servi ensuite via l'URL relative renvoyée (`photo_path`/`justificatif_path`, ex: `/uploads/objets/xxx.png`), à préfixer avec l'URL de base de l'API (`http://localhost:8000/uploads/objets/xxx.png`).
 
-## 9. CORS
+## 9. Notifications
+
+Générées automatiquement en base par le backend (pas de notifications push Firebase pour l'instant, uniquement un centre de notifications interne consultable via l'API) :
+
+| Événement | Type | Déclenché par |
+|---|---|---|
+| Nouvelle annonce | `NOUVELLE_ANNONCE` | Création d'une annonce (ciblée sur la classe, ou tous les étudiants si globale) |
+| Séance modifiée/annulée | `CHANGEMENT_SEANCE` | `PUT /emploi-du-temps/{id}` faisant passer le statut à `MODIFIE`/`ANNULE` |
+| Nouvel examen | `NOUVEL_EXAMEN` | Création d'un examen |
+| Réponse à une absence | `REPONSE_ABSENCE` | Traitement d'une demande d'absence (acceptée/refusée) |
+| Correspondance objet perdu/trouvé | `CORRESPONDANCE_OBJET` | Détection automatique d'une correspondance potentielle |
+
+Chaque notification porte `reference_type`/`reference_id` pointant vers la ressource concernée (ex: `"annonce"`/`12`), à utiliser pour rediriger l'utilisateur au clic.
+
+⚠️ Non implémenté : le rappel "devoir proche de la date limite" (demanderait une tâche planifiée récurrente, pas encore d'infrastructure de ce type) et les notifications push mobiles réelles (Firebase/FCM — demanderait des identifiants Firebase non configurés).
+
+## 10. CORS
 
 Le CORS est activé (`app/main.py`), configurable via `CORS_ALLOWED_ORIGINS` dans `.env`. En développement il est ouvert à toutes les origines (`*`). Pensez à le restreindre à l'URL réelle du frontend avant toute mise en production.
 
-## 10. Erreurs — format standard
+## 11. Erreurs — format standard
 
 Toutes les erreurs suivent le format FastAPI standard :
 
@@ -190,7 +206,7 @@ Toutes les erreurs suivent le format FastAPI standard :
 
 Sauf les erreurs de validation (422) qui suivent le format Pydantic habituel avec une liste détaillée par champ.
 
-## 11. Tests
+## 12. Tests
 
 ```bash
 python -m pytest tests/ -v
