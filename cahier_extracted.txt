@@ -1,0 +1,233 @@
+Cahier des charges CampusConnect AI
+1. Présentation du projet
+Nom du projet : CampusConnect AI
+Type : Plateforme web/mobile intelligente destinée aux étudiants.
+Concept :CampusConnect AI est une plateforme qui centralise les informations et services essentiels de la vie étudiante. Elle permet aux étudiants d'accéder aux annonces, à leur emploi du temps, aux devoirs et examens, aux démarches administratives ainsi qu'à un espace dédié aux objets perdus et trouvés.
+L'intelligence artificielle intervient pour analyser, organiser et relier les informations afin de proposer des notifications, des résumés et des correspondances pertinentes.
+2. Problématique
+Dans de nombreux établissements, les informations étudiantes sont dispersées entre plusieurs canaux : groupes WhatsApp, affichages, messages des responsables, documents et échanges directs.
+Cette organisation peut entraîner :
+La perte d'informations importantes ; 
+L’oubli de devoirs ou d'examens ; 
+Des difficultés à suivre les changements d'emploi du temps ; 
+Des démarches administratives longues ; 
+Des difficultés à retrouver un objet perdu ; 
+Une surcharge d'informations pour les étudiants. 
+Il existe donc un besoin d'une solution centralisée, simple et intelligente permettant aux étudiants de gérer leur vie académique depuis un seul espace.
+3. Objectifs
+Objectif général
+Créer une plateforme intelligente permettant de centraliser les informations et services étudiants tout en utilisant l'IA pour automatiser certaines tâches et faciliter la recherche d'informations.
+Objectifs spécifiques
+Centraliser les annonces de l'établissement. 
+Faciliter l'accès à l'emploi du temps. 
+Permettre le suivi des devoirs et examens. 
+Simplifier certaines démarches administratives. 
+Permettre de déclarer des objets perdus ou trouvés. 
+Utiliser l'IA pour analyser les informations. 
+Proposer automatiquement des correspondances entre objets perdus et trouvés. 
+Envoyer des notifications pertinentes aux étudiants. 
+4. Utilisateurs cibles
+ Étudiant
+Il peut :
+Consulter les annonces ; 
+Consulter son emploi du temps ; 
+Suivre ses devoirs et examens ; 
+Déclarer une absence ; 
+Publier un objet perdu ou trouvé ; 
+Recevoir des notifications ; 
+Consulter les correspondances proposées par l'IA. 
+ Enseignant / responsable
+Il peut :
+Publier des annonces ; 
+Modifier un emploi du temps ; 
+Ajouter des devoirs ou examens ; 
+Signaler des changements concernant les cours. 
+ Administration
+Elle peut :
+Gérer les étudiants ; 
+Gérer les annonces ; 
+Traiter les demandes d'absence ; 
+Gérer les emplois du temps ; 
+Superviser les signalements d'objets. 
+5. Fonctionnalités principales
+5.1.  Authentification
+L'utilisateur doit pouvoir :
+Créer un compte ; 
+Se connecter ; 
+Se déconnecter ; 
+Récupérer son mot de passe ; 
+Sélectionner sa classe/filière. 
+Les rôles seront :
+Étudiant 
+Enseignant/Responsable 
+Administrateur 
+6.  Fil d'actualité
+Le fil d'actualité permet de centraliser les informations officielles.
+Fonctionnalités
+L'étudiant peut :
+Consulter les annonces ; 
+Filtrer par catégorie ; 
+Rechercher une annonce ; 
+Consulter les annonces de sa classe/filière ; 
+Recevoir des notifications. 
+Catégories
+ Cours 
+ Examens 
+ Emploi du temps 
+ Administration 
+ Événements 
+ Objets perdus/trouvés 
+IA
+L'IA peut :
+Résumer une annonce ; 
+Identifier les informations importantes ; 
+Catégoriser automatiquement une annonce ; 
+Extraire une date, une heure, une salle ou une matière ; 
+Générer une notification claire. 
+7.  Emploi du temps intelligent
+L'étudiant dispose d'un emploi du temps numérique.
+Fonctionnalités
+Consulter les cours ; 
+Voir la salle ; 
+Voir l'enseignant ; 
+Consulter les horaires ; 
+Détecter les changements ; 
+Recevoir une notification. 
+IA
+L'IA peut analyser une annonce telle que :
+« Le cours de Python de demain prévu à 10h en salle A1 est déplacé à 14h en salle B2. »
+Elle extrait automatiquement :
+Matière : PythonHeure : 14hSalle : B2Type : changement de cours
+8.  Déclaration d'absence
+L'étudiant peut effectuer une demande d'absence directement depuis la plateforme.
+Fonctionnalités
+Sélectionner la date ; 
+Sélectionner le cours ; 
+Indiquer le motif ; 
+Joindre un justificatif ; 
+Envoyer la demande ; 
+Suivre son statut. 
+Statuts
+En attente 
+Acceptée 
+Refusée 
+IA
+L'IA peut :
+Aider à rédiger la demande ; 
+Extraire les informations d'un justificatif ; 
+Vérifier que les informations nécessaires sont présentes ; 
+Orienter l'étudiant vers la bonne procédure. 
+9. Devoirs et examens
+Un espace permet de centraliser les échéances académiques.
+Fonctionnalités
+Ajouter un devoir ; 
+Ajouter un examen ; 
+Consulter les échéances ; 
+Recevoir des rappels ; 
+Filtrer par matière ; 
+Voir les tâches à venir. 
+IA
+L'IA peut :
+Extraire automatiquement une date depuis une annonce ; 
+Identifier la matière concernée ; 
+Classer les échéances ; 
+Proposer un planning de révision. 
+10. Objets perdus et trouvés
+C'est la fonctionnalité IA principale du prototype.
+Déclarer un objet
+L'utilisateur sélectionne :
+Type :
+Objet perdu 
+Objet trouvé 
+Puis ajoute :
+ Photo ; 
+Description ; 
+ Lieu ; 
+Date ; 
+Informations complémentaires. 
+Exemple
+Objet perduTrousse noireSalle B2Contient un stylo bleu et une clé USB.
+11. Système de correspondance IA
+L'IA analyse chaque publication.
+Elle peut identifier :
+La catégorie ; 
+La couleur ; 
+Les caractéristiques ; 
+Le lieu ; 
+La date ; 
+Les mots-clés importants ; 
+Les informations présentes dans la photo. 
+Elle compare ensuite les objets perdus avec les objets trouvés.
+Exemple
+Objet perdu
+Trousse noire perdue en B2 avec un stylo bleu.
+Objet trouvé
+Trousse noire trouvée en B2 contenant un stylo bleu.
+Résultat
+ Correspondance potentielle détectée
+Une annonce d'objet trouvé présente plusieurs caractéristiques similaires à votre objet perdu : type, couleur, lieu et description.
+L'utilisateur peut ensuite consulter l'annonce.
+L'IA ne doit pas déclarer automatiquement que l'objet appartient à une personne. Elle propose seulement une correspondance à vérifier.
+12.  Notifications
+Le système peut envoyer des notifications lorsqu'un événement important se produit.
+Exemples :
+Changement de salle ; 
+Modification d'horaire ; 
+Nouvel examen ; 
+Devoir proche de la date limite ; 
+Réponse à une demande d'absence ; 
+Correspondance potentielle pour un objet perdu ; 
+Nouvelle annonce importante. 
+13.  Assistant IA
+Un espace conversationnel peut permettre à l'étudiant de poser des questions.
+Exemples :
+« Quand est mon prochain cours de Python ? »
+« Quels sont mes examens cette semaine ? »
+« Où puis-je déclarer une absence ? »
+« Est-ce qu'un objet correspond à ma trousse perdue ? »
+L'assistant doit privilégier les informations officielles disponibles sur la plateforme afin d'éviter de fournir des informations inventées.
+14. Tableau de bord étudiant
+Après connexion, l'étudiant arrive sur un tableau de bord présentant :
+Bienvenue ; 
+ Prochain cours ; 
+ Prochains devoirs ; 
+ Prochains examens ; 
+ Notifications ; 
+ Dernières annonces ; 
+ Correspondances d'objets ; 
+ Accès rapides aux services. 
+15. Interface administrateur
+L'administrateur dispose d'un tableau de bord permettant de :
+Gérer les utilisateurs ; 
+Publier/modifier/supprimer des annonces ; 
+Gérer les classes et filières ; 
+Gérer les emplois du temps ; 
+Gérer les devoirs et examens ; 
+Consulter les demandes d'absence ; 
+Modérer les annonces d'objets perdus/trouvés. 
+16. Technologies proposées
+Pour un prototype de hackathon :
+Frontend
+Flutter ou React 
+HTML/CSS/JavaScript si nécessaire 
+Backend
+Django + Django REST Frameworkou 
+Node.js / Express 
+Base de données
+PostgreSQL 
+IA
+Selon les possibilités du hackathon :
+API d'un modèle d'IA générative ; 
+modèle de vision pour l'analyse des images ; 
+embeddings / similarité sémantique pour comparer les descriptions. 
+Notifications
+Firebase Cloud Messaging pour les notifications push. 
+17. Sécurité
+La plateforme devra prévoir :
+Authentification sécurisée ; 
+Mots de passe chiffrés/hashés ; 
+Contrôle des rôles et permissions ; 
+Protection des données personnelles ; 
+Validation des fichiers envoyés ; 
+Contrôle des accès aux informations ; 
+HTTPS en production. 

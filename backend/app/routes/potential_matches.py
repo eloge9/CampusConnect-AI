@@ -10,6 +10,14 @@ from app.services import potential_match_service
 router = APIRouter(prefix="/correspondances", tags=["Correspondances"])
 
 
+@router.get("", response_model=list[PotentialMatchResponse])
+def lister_correspondances(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    """Liste toutes les correspondances IA concernant l'utilisateur courant (ou toutes si admin)."""
+    return potential_match_service.list_matches_for_user(db, current_user)
+
+
 @router.get("/{match_id}", response_model=PotentialMatchResponse)
 def obtenir_correspondance(
     match_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)

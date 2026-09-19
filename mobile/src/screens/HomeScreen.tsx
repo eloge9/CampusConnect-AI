@@ -46,10 +46,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onOpenNotifi
   const [refreshing, setRefreshing] = useState(false);
   const [claimState, setClaimState] = useState<'idle' | 'mine' | 'no'>('idle');
 
-  const [nextCourse, setNextCourse] = useState(MOCK_SCHEDULES[0]);
-  const [assignments, setAssignments] = useState(MOCK_ASSIGNMENTS);
-  const [announcements, setAnnouncements] = useState(MOCK_ANNOUNCEMENTS);
-  const [potentialMatch, setPotentialMatch] = useState(MOCK_MATCH);
+  const isDemoStudent = user?.email === 'etudiant@campusconnect.dev';
+  const [nextCourse, setNextCourse] = useState<any>(isDemoStudent ? MOCK_SCHEDULES[0] : null);
+  const [assignments, setAssignments] = useState<any[]>(isDemoStudent ? MOCK_ASSIGNMENTS : []);
+  const [announcements, setAnnouncements] = useState<any[]>(isDemoStudent ? MOCK_ANNOUNCEMENTS : []);
+  const [potentialMatch, setPotentialMatch] = useState<any>(isDemoStudent ? MOCK_MATCH : null);
 
   const loadData = async () => {
     try {
@@ -57,36 +58,62 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onOpenNotifi
       if (sch && sch.length > 0) {
         setNextCourse({
           ...sch[0],
-          course_title: sch[0].affectation?.subject?.name || 'Intelligence Artificielle',
+          course_title: sch[0].affectation?.subject?.name || sch[0].course_title || 'Intelligence Artificielle',
           teacher_name: sch[0].affectation?.teacher
             ? `Prof. ${sch[0].affectation.teacher.first_name} ${sch[0].affectation.teacher.last_name}`
-            : 'Prof. Jean-Marc Lecoq',
-          course_type: 'CM',
+            : sch[0].teacher_name || 'Prof. Référent',
+          course_type: sch[0].course_type || 'CM',
         });
+      } else {
+        setNextCourse(isDemoStudent ? MOCK_SCHEDULES[0] : null);
       }
     } catch {
-      // Offline fallback
+      if (isDemoStudent) setNextCourse(MOCK_SCHEDULES[0]);
     }
 
     try {
       const asgn = await api.getAssignments();
-      if (asgn && asgn.length > 0) setAssignments(asgn);
-    } catch {}
+      if (asgn && asgn.length > 0) {
+        setAssignments(asgn);
+      } else if (isDemoStudent) {
+        setAssignments(MOCK_ASSIGNMENTS);
+      } else {
+        setAssignments([]);
+      }
+    } catch {
+      if (isDemoStudent) setAssignments(MOCK_ASSIGNMENTS);
+    }
 
     try {
       const ann = await api.getAnnouncements();
-      if (ann && ann.length > 0) setAnnouncements(ann);
-    } catch {}
+      if (ann && ann.length > 0) {
+        setAnnouncements(ann);
+      } else if (isDemoStudent) {
+        setAnnouncements(MOCK_ANNOUNCEMENTS);
+      } else {
+        setAnnouncements([]);
+      }
+    } catch {
+      if (isDemoStudent) setAnnouncements(MOCK_ANNOUNCEMENTS);
+    }
 
     try {
       const matches = await api.getPotentialMatches();
-      if (matches && matches.length > 0) setPotentialMatch(matches[0]);
-    } catch {}
+      if (matches && matches.length > 0) {
+        setPotentialMatch(matches[0]);
+      } else if (isDemoStudent) {
+        setPotentialMatch(MOCK_MATCH);
+      } else {
+        setPotentialMatch(null);
+      }
+    } catch {
+      if (isDemoStudent) setPotentialMatch(MOCK_MATCH);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -135,112 +162,133 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onOpenNotifi
 
       {/* Academic Stat Badges */}
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
+        <TouchableOpacity style={styles.statCard} onPress={() => onNavigate('grades')} activeOpacity={0.8}>
           <Text style={styles.statValue}>14,8/20</Text>
           <Text style={styles.statLabel}>Moyenne Générale</Text>
-        </View>
+          <Text style={{ fontSize: 9, color: Colors.primary, fontWeight: '700', marginTop: 2 }}>Voir notes →</Text>
+        </TouchableOpacity>
         <View style={styles.statCard}>
           <Text style={[styles.statValue, { color: Colors.success }]}>96.2%</Text>
           <Text style={styles.statLabel}>Taux de Présence</Text>
         </View>
-        <View style={styles.statCard}>
+        <TouchableOpacity style={styles.statCard} onPress={() => onNavigate('grades')} activeOpacity={0.8}>
           <Text style={styles.statValue}>14 / 30</Text>
           <Text style={styles.statLabel}>Crédits ECTS</Text>
-        </View>
+          <Text style={{ fontSize: 9, color: Colors.primary, fontWeight: '700', marginTop: 2 }}>Détails →</Text>
+        </TouchableOpacity>
       </View>
 
       {/* PROCHAIN COURS CARD */}
       <Card style={styles.nextCourseCard}>
-        <View style={styles.cardHeaderRow}>
-          <View style={styles.cardTitleRow}>
-            <Clock size={16} color={Colors.primary} />
-            <Text style={styles.cardTitle}>Prochain cours</Text>
-          </View>
-          <Badge label="Dans 25 min" tone="info" />
-        </View>
-
-        <View style={styles.chipsRow}>
-          <Badge label="CM · INFORMATIQUE" tone="neutral" />
-          {nextCourse.status === 'MODIFIE' && (
-            <Badge label="SALLE MODIFIÉE" tone="warning" />
-          )}
-        </View>
-
-        <Text style={styles.courseTitle}>
-          {nextCourse.course_title || 'Intelligence Artificielle & Réseaux'}
-        </Text>
-
-        <View style={styles.metaStack}>
-          <View style={styles.metaItem}>
-            <Clock size={14} color={Colors.textMuted} />
-            <Text style={styles.metaText}>
-              {nextCourse.start_time} – {nextCourse.end_time}
-            </Text>
-          </View>
-          <View style={styles.metaItem}>
-            <MapPin size={14} color={Colors.textMuted} />
-            <Text style={styles.metaText}>{nextCourse.room}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <UserIcon size={14} color={Colors.textMuted} />
-            <Text style={styles.metaText}>
-              {nextCourse.teacher_name || 'Prof. Jean-Marc Lecoq'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.aiHintBox}>
-          <Sparkles size={14} color={Colors.primary} />
-          <Text style={styles.aiHintText}>
-            Diapositives de cours pré-téléchargées et résumées par l’assistant IA.
-          </Text>
-        </View>
-      </Card>
-
-      {/* CORRESPONDANCE IA POTENTIELLE CARD */}
-      <AIHighlightBox title="CORRESPONDANCE IA POTENTIELLE" badgeText="FIABILITÉ 88%">
-        {claimState === 'idle' ? (
+        {nextCourse ? (
           <>
-            <Text style={styles.matchNotice}>
-              Un objet trouvé correspond à votre déclaration d'objet perdu :
-            </Text>
-            <View style={styles.matchItemBox}>
-              <View style={styles.matchItemHeader}>
-                <Text style={styles.matchItemTitle}>Clé USB SanDisk 64Go</Text>
-                <Badge label="88% SIMILARITÉ" tone="success" size="sm" />
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardTitleRow}>
+                <Clock size={16} color={Colors.primary} />
+                <Text style={styles.cardTitle}>Prochain cours</Text>
               </View>
-              <Text style={styles.matchItemDesc}>
-                Trouvée ce matin au Foyer Turing. Coque plastique rouge/noire. Correspondance de couleur, lieu et type.
-              </Text>
+              <Badge label="À l'horaire" tone="info" />
             </View>
-            <View style={styles.matchActionsRow}>
-              <Button
-                title="C'est la mienne !"
-                onPress={() => handleClaim(true)}
-                variant="primary"
-                size="sm"
-                style={{ flex: 1 }}
-              />
-              <Button
-                title="Non"
-                onPress={() => handleClaim(false)}
-                variant="outline"
-                size="sm"
-                style={{ width: 65 }}
-              />
+
+            <View style={styles.chipsRow}>
+              <Badge label={`${nextCourse.course_type || 'CM'} · ${user?.classe?.code || 'CLASSE'}`} tone="neutral" />
+              {nextCourse.status === 'MODIFIE' && (
+                <Badge label="SALLE MODIFIÉE" tone="warning" />
+              )}
+            </View>
+
+            <Text style={styles.courseTitle}>
+              {nextCourse.course_title || 'Intelligence Artificielle & Réseaux'}
+            </Text>
+
+            <View style={styles.metaStack}>
+              <View style={styles.metaItem}>
+                <Clock size={14} color={Colors.textMuted} />
+                <Text style={styles.metaText}>
+                  {nextCourse.start_time} – {nextCourse.end_time}
+                </Text>
+              </View>
+              <View style={styles.metaItem}>
+                <MapPin size={14} color={Colors.textMuted} />
+                <Text style={styles.metaText}>{nextCourse.room || 'Salle A101'}</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <UserIcon size={14} color={Colors.textMuted} />
+                <Text style={styles.metaText}>
+                  {nextCourse.teacher_name || 'Prof. Référent'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.aiHintBox}>
+              <Sparkles size={14} color={Colors.primary} />
+              <Text style={styles.aiHintText}>
+                Support de cours et synthèse IA synchronisés pour votre classe.
+              </Text>
             </View>
           </>
         ) : (
-          <View style={styles.claimResultBox}>
-            <CheckCircle2 size={18} color={claimState === 'mine' ? Colors.success : Colors.textMuted} />
-            <Text style={styles.claimResultText}>
-              {claimState === 'mine'
-                ? 'Demande validée ! Rendez-vous au Foyer Turing avec votre carte étudiante.'
-                : 'Objet retiré de vos suggestions.'}
+          <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+            <Calendar size={28} color={Colors.primary} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.textDark, marginTop: 8 }}>
+              Aucun cours prévu aujourd'hui
+            </Text>
+            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4, textAlign: 'center' }}>
+              Consultez l'emploi du temps pour les prochaines séances de {user?.classe?.name || 'votre promotion'}.
             </Text>
           </View>
         )}
-      </AIHighlightBox>
+      </Card>
+
+      {/* CORRESPONDANCE IA POTENTIELLE CARD */}
+      {potentialMatch ? (
+        <AIHighlightBox
+          title="CORRESPONDANCE IA POTENTIELLE"
+          badgeText={`${potentialMatch.confidence_score ? Math.round(potentialMatch.confidence_score * 100) : 88}% FIABILITÉ`}
+        >
+          {claimState === 'idle' ? (
+            <>
+              <Text style={styles.matchNotice}>
+                Un objet trouvé correspond à votre déclaration d'objet perdu :
+              </Text>
+              <View style={styles.matchItemBox}>
+                <View style={styles.matchItemHeader}>
+                  <Text style={styles.matchItemTitle}>{potentialMatch.matched_item?.title || 'Clé USB SanDisk 64Go'}</Text>
+                  <Badge label={`${potentialMatch.confidence_score ? Math.round(potentialMatch.confidence_score * 100) : 88}% SIMILARITÉ`} tone="success" size="sm" />
+                </View>
+                <Text style={styles.matchItemDesc}>
+                  {potentialMatch.explanation || potentialMatch.matched_item?.description || 'Trouvée au Foyer Turing. Correspondance identifiée par l’IA CampusConnect.'}
+                </Text>
+              </View>
+              <View style={styles.matchActionsRow}>
+                <Button
+                  title="C'est la mienne !"
+                  onPress={() => handleClaim(true)}
+                  variant="primary"
+                  size="sm"
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  title="Non"
+                  onPress={() => handleClaim(false)}
+                  variant="outline"
+                  size="sm"
+                  style={{ width: 65 }}
+                />
+              </View>
+            </>
+          ) : (
+            <View style={styles.claimResultBox}>
+              <CheckCircle2 size={18} color={claimState === 'mine' ? Colors.success : Colors.textMuted} />
+              <Text style={styles.claimResultText}>
+                {claimState === 'mine'
+                  ? 'Demande validée ! Rendez-vous au Foyer Turing avec votre carte étudiante.'
+                  : 'Objet retiré de vos suggestions.'}
+              </Text>
+            </View>
+          )}
+        </AIHighlightBox>
+      ) : null}
 
       {/* QUICK ACTIONS GRID */}
       <View style={styles.sectionHeaderRow}>
@@ -304,30 +352,38 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onOpenNotifi
         </TouchableOpacity>
       </View>
 
-      {assignments.slice(0, 2).map((item) => (
-        <Card
-          key={item.id}
-          style={styles.homeworkCard}
-          onPress={() => onNavigate('academics')}
-        >
-          <View style={styles.hwRow}>
-            <View style={styles.hwLeft}>
-              <View style={styles.hwIcon}>
-                <FileText size={16} color={Colors.primary} />
+      {assignments.length > 0 ? (
+        assignments.slice(0, 2).map((item) => (
+          <Card
+            key={item.id}
+            style={styles.homeworkCard}
+            onPress={() => onNavigate('academics')}
+          >
+            <View style={styles.hwRow}>
+              <View style={styles.hwLeft}>
+                <View style={styles.hwIcon}>
+                  <FileText size={16} color={Colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.hwTitle}>{item.title}</Text>
+                  <Text style={styles.hwDesc} numberOfLines={1}>
+                    {item.description}
+                  </Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.hwTitle}>{item.title}</Text>
-                <Text style={styles.hwDesc} numberOfLines={1}>
-                  {item.description}
-                </Text>
+              <View style={styles.hwRight}>
+                <Text style={styles.hwWhen}>{item.due_date}</Text>
               </View>
             </View>
-            <View style={styles.hwRight}>
-              <Text style={styles.hwWhen}>{item.due_date}</Text>
-            </View>
-          </View>
+          </Card>
+        ))
+      ) : (
+        <Card style={styles.homeworkCard}>
+          <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center', paddingVertical: 6 }}>
+            Aucun devoir à rendre pour votre classe pour le moment.
+          </Text>
         </Card>
-      ))}
+      )}
 
       {/* LATEST ANNOUNCEMENTS */}
       <View style={styles.sectionHeaderRow}>

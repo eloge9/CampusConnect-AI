@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
+from app.models.school_class import Class
 from app.models.user import User, UserRole
 from app.schemas.auth import TokenResponse
 from app.schemas.user import UserCreate
@@ -19,6 +20,12 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     if get_user_by_email(db, user_in.email) is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cet email est déjà utilisé.")
 
+    target_class_id = user_in.class_id
+    if target_class_id is None:
+        first_class = db.query(Class).first()
+        if first_class:
+            target_class_id = first_class.id
+
     user = User(
         first_name=user_in.first_name,
         last_name=user_in.last_name,
@@ -26,6 +33,7 @@ def create_user(db: Session, user_in: UserCreate) -> User:
         phone=user_in.phone,
         password_hash=hash_password(user_in.password),
         role=UserRole.STUDENT,
+        class_id=target_class_id,
     )
     db.add(user)
     db.commit()

@@ -188,3 +188,45 @@ export interface AssistantMessage {
   suggestions?: string[];
   actionType?: 'schedule' | 'exam' | 'absence' | 'lost_found';
 }
+
+export interface Grade {
+  id: number;
+  subject_name: string;
+  subject_code: string;
+  teacher_name: string;
+  grade_type: 'CC' | 'TD' | 'TP' | 'PARTIEL' | 'PROJET';
+  value: number;
+  max_value: number;
+  coefficient: number;
+  date: string;
+  comment?: string;
+  rank?: number;
+  class_average?: number;
+}
+
+export interface SubjectGrades {
+  subject_id: number;
+  subject_name: string;
+  subject_code: string;
+  teacher_name: string;
+  ects_credits: number;
+  color: string;
+  grades: Grade[];
+  average: number;
+  class_average: number;
+  coefficient: number;
+  rank?: number;
+}
+
+export interface Transcript {
+  semester: string;
+  year: string;
+  overall_average: number;
+  class_average: number;
+  ects_validated: number;
+  ects_total: number;
+  rank: number;
+  class_size: number;
+  mention?: string;
+  subjects: SubjectGrades[];
+}

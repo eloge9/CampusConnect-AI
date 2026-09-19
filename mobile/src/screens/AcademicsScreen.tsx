@@ -14,6 +14,7 @@ import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { AIHighlightBox } from '../components/AIHighlightBox';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { MOCK_ASSIGNMENTS, MOCK_EXAMS } from '../data/mockData';
 import { Assignment, Exam } from '../types';
 import {
@@ -25,29 +26,51 @@ import {
   FileCheck,
   UploadCloud,
   ChevronRight,
+  Plus,
+  Users,
 } from 'lucide-react-native';
 
 export const AcademicsScreen: React.FC = () => {
+  const { role, user } = useAuth();
+  const isDemoStudent = user?.email === 'etudiant@campusconnect.dev';
   const [tab, setTab] = useState<'assignments' | 'exams'>('assignments');
-  const [assignments, setAssignments] = useState<Assignment[]>(MOCK_ASSIGNMENTS);
-  const [exams, setExams] = useState<Exam[]>(MOCK_EXAMS);
+  const [assignments, setAssignments] = useState<Assignment[]>(isDemoStudent ? MOCK_ASSIGNMENTS : []);
+  const [exams, setExams] = useState<Exam[]>(isDemoStudent ? MOCK_EXAMS : []);
   const [refreshing, setRefreshing] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+
+  const isTeacher = role === 'TEACHER' || role === 'ADMIN';
 
   const loadData = async () => {
     try {
       const a = await api.getAssignments();
-      if (a && a.length > 0) setAssignments(a);
-    } catch {}
+      if (a && a.length > 0) {
+        setAssignments(a);
+        setIsLive(true);
+      } else {
+        setAssignments(isDemoStudent ? MOCK_ASSIGNMENTS : []);
+        setIsLive(true);
+      }
+    } catch {
+      if (isDemoStudent) setAssignments(MOCK_ASSIGNMENTS);
+      setIsLive(false);
+    }
 
     try {
       const e = await api.getExams();
-      if (e && e.length > 0) setExams(e);
-    } catch {}
+      if (e && e.length > 0) {
+        setExams(e);
+      } else {
+        setExams(isDemoStudent ? MOCK_EXAMS : []);
+      }
+    } catch {
+      if (isDemoStudent) setExams(MOCK_EXAMS);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -117,95 +140,139 @@ export const AcademicsScreen: React.FC = () => {
         {tab === 'assignments' ? (
           <>
             <Text style={styles.sectionHeading}>Devoirs & Travaux Pratiques</Text>
-            {assignments.map((item) => (
-              <Card key={item.id} style={styles.itemCard}>
-                <View style={styles.itemHeader}>
-                  <Badge label="À RENDRE" tone="danger" size="sm" />
-                  <Text style={styles.dueText}>{item.due_date}</Text>
-                </View>
-
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.itemDesc}>{item.description}</Text>
-
-                <View style={styles.footerRow}>
-                  <Button
-                    title="Déposer mon travail"
-                    onPress={() =>
-                      Alert.alert(
-                        'Déposer un devoir',
-                        `Sélectionner une archive .zip pour « ${item.title} » ?`,
-                        [
-                          { text: 'Annuler', style: 'cancel' },
-                          {
-                            text: 'Sélectionner un fichier',
-                            onPress: () =>
-                              Alert.alert('Succès', 'Devoir transmis au secrétariat académique.'),
-                          },
-                        ]
-                      )
-                    }
-                    size="sm"
-                    variant="primary"
-                    icon={<UploadCloud size={14} color="#FFF" />}
-                  />
-                  <TouchableOpacity
-                    style={styles.detailsLink}
-                    onPress={() =>
-                      Alert.alert(
-                        item.title,
-                        `Consignes : ${item.description}\nÉchéance stricte : ${item.due_date}`
-                      )
-                    }
-                  >
-                    <Text style={styles.detailsLinkText}>Consignes</Text>
-                    <ChevronRight size={14} color={Colors.primary} />
-                  </TouchableOpacity>
-                </View>
+            {assignments.length === 0 ? (
+              <Card style={{ padding: 24, alignItems: 'center' }}>
+                <ClipboardList size={32} color={Colors.textMuted} />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.textDark, marginTop: 10 }}>
+                  Aucun devoir à rendre
+                </Text>
+                <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginTop: 4 }}>
+                  Aucune tâche ou TP n’a été assigné pour votre classe pour le moment.
+                </Text>
               </Card>
-            ))}
+            ) : (
+              assignments.map((item) => (
+                <Card key={item.id} style={styles.itemCard}>
+                  <View style={styles.itemHeader}>
+                    <Badge label="À RENDRE" tone="danger" size="sm" />
+                    <Text style={styles.dueText}>{item.due_date}</Text>
+                  </View>
+
+                  <Text style={styles.itemTitle}>{item.title}</Text>
+                  <Text style={styles.itemDesc}>{item.description}</Text>
+
+                  <View style={styles.footerRow}>
+                    {isTeacher ? (
+                      <Button
+                        title="Dépôts étudiants (24/32)"
+                        onPress={() =>
+                          Alert.alert(
+                            'Dépôts étudiants',
+                            `24 binômes sur 32 ont déjà déposé leur archive pour "${item.title}".\n\nTélécharger le bundle d'archives pour correction ?`,
+                            [
+                              { text: 'Fermer', style: 'cancel' },
+                              { text: 'Télécharger (ZIP)', onPress: () => Alert.alert('Téléchargement', 'Archives téléchargées.') },
+                            ]
+                          )
+                        }
+                        size="sm"
+                        variant="outline"
+                        icon={<Users size={14} color={Colors.primary} />}
+                      />
+                    ) : (
+                      <Button
+                        title="Déposer mon travail"
+                        onPress={() =>
+                          Alert.alert(
+                            'Déposer un devoir',
+                            `Sélectionner une archive .zip pour « ${item.title} » ?`,
+                            [
+                              { text: 'Annuler', style: 'cancel' },
+                              {
+                                text: 'Sélectionner un fichier',
+                                onPress: () =>
+                                  Alert.alert('Succès', 'Devoir transmis au secrétariat académique.'),
+                              },
+                            ]
+                          )
+                        }
+                        size="sm"
+                        variant="primary"
+                        icon={<UploadCloud size={14} color="#FFF" />}
+                      />
+                    )}
+
+                    <TouchableOpacity
+                      style={styles.detailsLink}
+                      onPress={() =>
+                        Alert.alert(
+                          item.title,
+                          `Consignes : ${item.description}\nÉchéance stricte : ${item.due_date}`
+                        )
+                      }
+                    >
+                      <Text style={styles.detailsLinkText}>Consignes</Text>
+                      <ChevronRight size={14} color={Colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                </Card>
+              ))
+            )}
           </>
         ) : (
           <>
             <Text style={styles.sectionHeading}>Sessions d'Évaluation & Examens</Text>
-            {exams.map((exam) => (
-              <Card key={exam.id} style={styles.itemCard}>
-                <View style={styles.itemHeader}>
-                  <Badge label="CONTRÔLE" tone="warning" size="sm" />
-                  <Text style={styles.dueText}>{exam.exam_date}</Text>
-                </View>
-
-                <Text style={styles.itemTitle}>{exam.title}</Text>
-                <Text style={styles.itemDesc}>{exam.description}</Text>
-
-                <View style={styles.examMetaGrid}>
-                  <View style={styles.metaRow}>
-                    <Clock size={14} color={Colors.textMuted} />
-                    <Text style={styles.metaLabel}>
-                      {exam.start_time} – {exam.end_time}
-                    </Text>
-                  </View>
-                  <View style={styles.metaRow}>
-                    <MapPin size={14} color={Colors.textMuted} />
-                    <Text style={styles.metaLabel}>{exam.room}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.examFooter}>
-                  <Button
-                    title="Consulter ma convocation"
-                    size="sm"
-                    variant="outline"
-                    onPress={() =>
-                      Alert.alert(
-                        'Convocation officielle',
-                        `Épreuve : ${exam.title}\nSalle : ${exam.room}\nDate : ${exam.exam_date}\nPrésentez votre carte étudiante 15 minutes avant le début de l’épreuve.`
-                      )
-                    }
-                    style={{ flex: 1 }}
-                  />
-                </View>
+            {exams.length === 0 ? (
+              <Card style={{ padding: 24, alignItems: 'center' }}>
+                <Calendar size={32} color={Colors.textMuted} />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.textDark, marginTop: 10 }}>
+                  Aucun examen programmé
+                </Text>
+                <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginTop: 4 }}>
+                  Aucune session d'examen n'est planifiée pour votre classe actuellement.
+                </Text>
               </Card>
-            ))}
+            ) : (
+              exams.map((exam) => (
+                <Card key={exam.id} style={styles.itemCard}>
+                  <View style={styles.itemHeader}>
+                    <Badge label="CONTRÔLE" tone="warning" size="sm" />
+                    <Text style={styles.dueText}>{exam.exam_date}</Text>
+                  </View>
+
+                  <Text style={styles.itemTitle}>{exam.title}</Text>
+                  <Text style={styles.itemDesc}>{exam.description}</Text>
+
+                  <View style={styles.examMetaGrid}>
+                    <View style={styles.metaRow}>
+                      <Clock size={14} color={Colors.textMuted} />
+                      <Text style={styles.metaLabel}>
+                        {exam.start_time} – {exam.end_time}
+                      </Text>
+                    </View>
+                    <View style={styles.metaRow}>
+                      <MapPin size={14} color={Colors.textMuted} />
+                      <Text style={styles.metaLabel}>{exam.room}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.examFooter}>
+                    <Button
+                      title="Consulter ma convocation"
+                      size="sm"
+                      variant="outline"
+                      onPress={() =>
+                        Alert.alert(
+                          'Convocation officielle',
+                          `Épreuve : ${exam.title}\nSalle : ${exam.room}\nDate : ${exam.exam_date}\nPrésentez votre carte étudiante 15 minutes avant le début de l’épreuve.`
+                        )
+                      }
+                      style={{ flex: 1 }}
+                    />
+                  </View>
+                </Card>
+              ))
+            )}
           </>
         )}
       </ScrollView>

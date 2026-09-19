@@ -96,7 +96,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onOpenAd
                 size="sm"
               />
               {role === 'STUDENT' && (
-                <Badge label={user?.classe?.code || 'L3-INFO'} tone="neutral" size="sm" />
+                <Badge label={user?.classe?.code || (user?.class_id === 2 ? 'M1-GL' : 'L3-INFO')} tone="neutral" size="sm" />
               )}
             </View>
           </View>
@@ -106,11 +106,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onOpenAd
           <View style={styles.studentDetailsRow}>
             <View style={styles.studentDetailItem}>
               <Text style={styles.detailLabel}>N° Étudiant</Text>
-              <Text style={styles.detailVal}>22004815</Text>
+              <Text style={styles.detailVal}>{user?.id ? `ETU-${user.id + 202400}` : 'ETU-2024042'}</Text>
             </View>
             <View style={styles.studentDetailItem}>
-              <Text style={styles.detailLabel}>Semestre</Text>
-              <Text style={styles.detailVal}>Semestre 6</Text>
+              <Text style={styles.detailLabel}>Filière</Text>
+              <Text style={styles.detailVal}>{user?.classe?.code || (user?.class_id === 2 ? 'M1 Génie Log.' : 'L3 Info.')}</Text>
             </View>
             <View style={styles.studentDetailItem}>
               <Text style={styles.detailLabel}>Promotion</Text>

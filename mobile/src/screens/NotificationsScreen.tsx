@@ -12,6 +12,7 @@ import { Colors } from '../theme/colors';
 import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { MOCK_NOTIFICATIONS } from '../data/mockData';
 import { Notification } from '../types';
 import {
@@ -24,19 +25,27 @@ import {
 } from 'lucide-react-native';
 
 export const NotificationsScreen: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const { user } = useAuth();
+  const isDemoStudent = user?.email === 'etudiant@campusconnect.dev';
+  const [notifications, setNotifications] = useState<Notification[]>(isDemoStudent ? MOCK_NOTIFICATIONS : []);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadNotifications = async () => {
     try {
       const data = await api.getNotifications();
-      if (data && data.length > 0) setNotifications(data);
-    } catch {}
+      if (data && data.length > 0) {
+        setNotifications(data);
+      } else {
+        setNotifications(isDemoStudent ? MOCK_NOTIFICATIONS : []);
+      }
+    } catch {
+      if (isDemoStudent) setNotifications(MOCK_NOTIFICATIONS);
+    }
   };
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [user?.id]);
 
   const markAllAsRead = async () => {
     try {
@@ -83,26 +92,38 @@ export const NotificationsScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadNotifications} />}
         showsVerticalScrollIndicator={false}
       >
-        {notifications.map((notif) => (
-          <TouchableOpacity
-            key={notif.id}
-            style={[styles.notifCard, !notif.is_read && styles.notifUnread]}
-            onPress={() => markSingleAsRead(notif.id)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.iconCircle}>{getNotificationIcon(notif.type)}</View>
+        {notifications.length === 0 ? (
+          <Card style={{ padding: 24, alignItems: 'center' }}>
+            <Bell size={32} color={Colors.textMuted} />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.textDark, marginTop: 10 }}>
+              Aucune notification
+            </Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginTop: 4 }}>
+              Vous êtes à jour ! Les alertes de cours et rappels s'afficheront ici.
+            </Text>
+          </Card>
+        ) : (
+          notifications.map((notif) => (
+            <TouchableOpacity
+              key={notif.id}
+              style={[styles.notifCard, !notif.is_read && styles.notifUnread]}
+              onPress={() => markSingleAsRead(notif.id)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.iconCircle}>{getNotificationIcon(notif.type)}</View>
 
-            <View style={{ flex: 1 }}>
-              <View style={styles.notifTopRow}>
-                <Text style={styles.notifTitle}>{notif.title}</Text>
-                <Text style={styles.notifTime}>{notif.created_at}</Text>
+              <View style={{ flex: 1 }}>
+                <View style={styles.notifTopRow}>
+                  <Text style={styles.notifTitle}>{notif.title}</Text>
+                  <Text style={styles.notifTime}>{notif.created_at}</Text>
+                </View>
+                <Text style={styles.notifMsg}>{notif.message}</Text>
               </View>
-              <Text style={styles.notifMsg}>{notif.message}</Text>
-            </View>
 
-            {!notif.is_read && <View style={styles.unreadDot} />}
-          </TouchableOpacity>
-        ))}
+              {!notif.is_read && <View style={styles.unreadDot} />}
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </View>
   );

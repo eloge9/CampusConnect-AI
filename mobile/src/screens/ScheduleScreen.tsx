@@ -26,6 +26,8 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 
+import { useAuth } from '../context/AuthContext';
+
 const DAYS = [
   { id: 'lun', label: 'Lun', num: '14' },
   { id: 'mar', label: 'Mar', num: '15', active: true },
@@ -42,9 +44,12 @@ interface ScheduleScreenProps {
 export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
   onDeclareAbsenceForSchedule,
 }) => {
+  const { user } = useAuth();
+  const isDemoStudent = user?.email === 'etudiant@campusconnect.dev';
   const [selectedDay, setSelectedDay] = useState('mar');
-  const [schedules, setSchedules] = useState<ScheduleItem[]>(MOCK_SCHEDULES);
+  const [schedules, setSchedules] = useState<ScheduleItem[]>(isDemoStudent ? MOCK_SCHEDULES : []);
   const [refreshing, setRefreshing] = useState(false);
+  const [isLive, setIsLive] = useState(false);
 
   const loadSchedules = async () => {
     try {
@@ -54,6 +59,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
           ...s,
           course_title:
             s.affectation?.subject?.name ||
+            s.course_title ||
             (idx === 0
               ? 'Intelligence Artificielle & Réseaux'
               : idx === 1
@@ -61,19 +67,28 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
               : 'Bases de Données NoSQL'),
           teacher_name: s.affectation?.teacher
             ? `Prof. ${s.affectation.teacher.first_name} ${s.affectation.teacher.last_name}`
-            : 'Prof. Jean-Marc Lecoq',
-          course_type: idx === 0 ? ('CM' as const) : idx === 1 ? ('TD' as const) : ('TP' as const),
+            : s.teacher_name || 'Prof. Référent',
+          start_time: typeof s.start_time === 'string' ? s.start_time.substring(0, 5) : s.start_time,
+          end_time: typeof s.end_time === 'string' ? s.end_time.substring(0, 5) : s.end_time,
+          course_type:
+            s.course_type ||
+            (idx === 0 ? ('CM' as const) : idx === 1 ? ('TD' as const) : ('TP' as const)),
         }));
         setSchedules(enriched);
+        setIsLive(true);
+      } else {
+        setSchedules(isDemoStudent ? MOCK_SCHEDULES : []);
+        setIsLive(true);
       }
     } catch {
-      // Fallback to mock
+      if (isDemoStudent) setSchedules(MOCK_SCHEDULES);
+      setIsLive(false);
     }
   };
 
   useEffect(() => {
     loadSchedules();
-  }, []);
+  }, [user?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -81,9 +96,11 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
     setRefreshing(false);
   };
 
-  // Simuler filtre par jour
+  // Filtrer ou simuler cours par jour
   const currentDaySchedules =
-    selectedDay === 'mar'
+    schedules.length === 0
+      ? []
+      : selectedDay === 'mar'
       ? schedules.slice(0, 2)
       : selectedDay === 'mer'
       ? schedules.slice(2, 4)
@@ -134,84 +151,100 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
 
         <Text style={styles.dayHeading}>
           {selectedDay === 'mar'
-            ? 'Mardi 15 Avril 2025 · 2 cours prévus'
+            ? 'Mardi 15 Avril 2025'
             : selectedDay === 'mer'
-            ? 'Mercredi 16 Avril 2025 · 2 cours prévus'
-            : 'Emploi du temps'}
+            ? 'Mercredi 16 Avril 2025'
+            : selectedDay === 'jeu'
+            ? 'Jeudi 17 Avril 2025'
+            : selectedDay === 'ven'
+            ? 'Vendredi 18 Avril 2025'
+            : 'Emploi du temps'} · {currentDaySchedules.length} séance(s)
         </Text>
 
-        {currentDaySchedules.map((item, index) => {
-          const isModified = item.status === 'MODIFIE';
-          return (
-            <Card key={item.id} style={styles.sessionCard}>
-              <View style={styles.sessionHeaderRow}>
-                <View style={styles.timeBox}>
-                  <Clock size={14} color={Colors.primary} />
-                  <Text style={styles.timeText}>
-                    {item.start_time} – {item.end_time}
+        {currentDaySchedules.length === 0 ? (
+          <Card style={{ padding: 24, alignItems: 'center' }}>
+            <Calendar size={32} color={Colors.textMuted} />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.textDark, marginTop: 10 }}>
+              Aucun cours ce jour
+            </Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginTop: 4 }}>
+              Aucune séance programmée pour {user?.classe?.name || 'votre groupe'} pour cette journée.
+            </Text>
+          </Card>
+        ) : (
+          currentDaySchedules.map((item, index) => {
+            const isModified = item.status === 'MODIFIE';
+            return (
+              <Card key={item.id} style={styles.sessionCard}>
+                <View style={styles.sessionHeaderRow}>
+                  <View style={styles.timeBox}>
+                    <Clock size={14} color={Colors.primary} />
+                    <Text style={styles.timeText}>
+                      {item.start_time} – {item.end_time}
+                    </Text>
+                  </View>
+                  <View style={styles.badgesRow}>
+                    <Badge label={item.course_type || 'CM'} tone="neutral" size="sm" />
+                    {isModified && (
+                      <Badge label="MODIFIÉ" tone="warning" size="sm" />
+                    )}
+                  </View>
+                </View>
+
+                <Text style={styles.sessionTitle}>{item.course_title}</Text>
+
+                <View style={styles.infoRow}>
+                  <MapPin size={15} color={isModified ? Colors.warningText : Colors.textMuted} />
+                  <Text
+                    style={[
+                      styles.infoText,
+                      isModified && { color: Colors.warningText, fontWeight: '700' },
+                    ]}
+                  >
+                    {item.room}
                   </Text>
                 </View>
-                <View style={styles.badgesRow}>
-                  <Badge label={item.course_type || 'CM'} tone="neutral" size="sm" />
-                  {isModified && (
-                    <Badge label="MODIFIÉ" tone="warning" size="sm" />
-                  )}
+
+                <View style={styles.infoRow}>
+                  <UserIcon size={15} color={Colors.textMuted} />
+                  <Text style={styles.infoText}>{item.teacher_name}</Text>
                 </View>
-              </View>
 
-              <Text style={styles.sessionTitle}>{item.course_title}</Text>
+                <View style={styles.sessionFooter}>
+                  <TouchableOpacity
+                    style={styles.absenceBtn}
+                    onPress={() => {
+                      if (onDeclareAbsenceForSchedule) {
+                        onDeclareAbsenceForSchedule(item.id);
+                      } else {
+                        Alert.alert(
+                          'Déclarer une absence',
+                          `Signaler une absence pour le cours de ${item.course_title} ?`
+                        );
+                      }
+                    }}
+                  >
+                    <AlertTriangle size={13} color={Colors.danger} />
+                    <Text style={styles.absenceBtnText}>Signaler une absence</Text>
+                  </TouchableOpacity>
 
-              <View style={styles.infoRow}>
-                <MapPin size={15} color={isModified ? Colors.warningText : Colors.textMuted} />
-                <Text
-                  style={[
-                    styles.infoText,
-                    isModified && { color: Colors.warningText, fontWeight: '700' },
-                  ]}
-                >
-                  {item.room}
-                </Text>
-              </View>
-
-              <View style={styles.infoRow}>
-                <UserIcon size={15} color={Colors.textMuted} />
-                <Text style={styles.infoText}>{item.teacher_name}</Text>
-              </View>
-
-              <View style={styles.sessionFooter}>
-                <TouchableOpacity
-                  style={styles.absenceBtn}
-                  onPress={() => {
-                    if (onDeclareAbsenceForSchedule) {
-                      onDeclareAbsenceForSchedule(item.id);
-                    } else {
+                  <TouchableOpacity
+                    style={styles.detailsBtn}
+                    onPress={() =>
                       Alert.alert(
-                        'Déclarer une absence',
-                        `Signaler une absence pour le cours de ${item.course_title} ?`
-                      );
+                        item.course_title || 'Cours',
+                        `Enseignant : ${item.teacher_name}\nSalle : ${item.room}\nSupport de cours téléchargeable sur CampusConnect.`
+                      )
                     }
-                  }}
-                >
-                  <AlertTriangle size={13} color={Colors.danger} />
-                  <Text style={styles.absenceBtnText}>Signaler une absence</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.detailsBtn}
-                  onPress={() =>
-                    Alert.alert(
-                      item.course_title || 'Cours',
-                      `Enseignant : ${item.teacher_name}\nSalle : ${item.room}\nSupport de cours téléchargeable sur CampusConnect.`
-                    )
-                  }
-                >
-                  <Text style={styles.detailsBtnText}>Détails</Text>
-                  <ChevronRight size={14} color={Colors.primary} />
-                </TouchableOpacity>
-              </View>
-            </Card>
-          );
-        })}
+                  >
+                    <Text style={styles.detailsBtnText}>Détails</Text>
+                    <ChevronRight size={14} color={Colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </Card>
+            );
+          })
+        )}
       </ScrollView>
     </View>
   );

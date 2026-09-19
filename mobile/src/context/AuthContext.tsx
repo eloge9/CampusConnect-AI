@@ -28,7 +28,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(DEMO_USERS.student);
+  const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole>('STUDENT');
   const [token, setTokenState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -52,23 +52,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       try {
         await api.loadToken();
-        const savedRole = await AsyncStorage.getItem('@campus_active_role');
-        if (savedRole && (savedRole === 'STUDENT' || savedRole === 'TEACHER' || savedRole === 'ADMIN')) {
-          setRole(savedRole as UserRole);
-          if (savedRole === 'TEACHER') setUser(DEMO_USERS.teacher);
-          else if (savedRole === 'ADMIN') setUser(DEMO_USERS.admin);
-          else setUser(DEMO_USERS.student);
+
+        // 1. Restaurer le profil utilisateur sauvegardé s'il existe
+        const savedProfileStr = await AsyncStorage.getItem('@campus_user_profile');
+        if (savedProfileStr) {
+          try {
+            const savedProfile = JSON.parse(savedProfileStr);
+            setUser(savedProfile);
+            setRole(savedProfile.role);
+          } catch {}
+        } else {
+          // Aucun profil personnalisé : vérifier si un rôle démo est enregistré
+          const savedRole = await AsyncStorage.getItem('@campus_active_role');
+          if (savedRole && (savedRole === 'STUDENT' || savedRole === 'TEACHER' || savedRole === 'ADMIN')) {
+            setRole(savedRole as UserRole);
+            if (savedRole === 'TEACHER') setUser(DEMO_USERS.teacher);
+            else if (savedRole === 'ADMIN') setUser(DEMO_USERS.admin);
+            else setUser(DEMO_USERS.student);
+          } else {
+            setUser(DEMO_USERS.student);
+          }
         }
 
-        // Tenter de joindre le backend
+        // 2. Tenter de synchroniser en direct avec le backend
         const isOnline = await checkBackendHealth();
         if (isOnline) {
           try {
             const me = await api.getMe();
             setUser(me);
             setRole(me.role);
+            await AsyncStorage.setItem('@campus_user_profile', JSON.stringify(me));
+            await AsyncStorage.setItem('@campus_active_role', me.role);
           } catch {
-            // Token expiré ou absent : conserver profil démo
+            // Token expiré ou absent : conserver profil en cache
           }
         }
       } catch (e) {
@@ -89,18 +105,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const me = await api.getMe();
       setUser(me);
       setRole(me.role);
+      await AsyncStorage.setItem('@campus_user_profile', JSON.stringify(me));
       await AsyncStorage.setItem('@campus_active_role', me.role);
       setIsBackendConnected(true);
     } catch (e: any) {
-      // Si backend hors-ligne, vérifier si c'est un compte démo
+      // Si backend inaccessible, seulement si c'est un compte démo officiel
       const em = email.toLowerCase().trim();
-      if (em.includes('admin')) {
+      if (em.includes('admin@campusconnect.dev')) {
         setUser(DEMO_USERS.admin);
         setRole('ADMIN');
-      } else if (em.includes('enseignant') || em.includes('teacher')) {
+      } else if (em.includes('enseignant@campusconnect.dev')) {
         setUser(DEMO_USERS.teacher);
         setRole('TEACHER');
-      } else {
+      } else if (em.includes('etudiant@campusconnect.dev')) {
         setUser(DEMO_USERS.student);
         setRole('STUDENT');
       }
@@ -119,8 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }) => {
     setIsLoading(true);
     try {
-      const newUser = await api.register(body);
-      // Auto login après inscription
+      await api.register(body);
+      // Auto login après inscription avec les vraies données du nouvel utilisateur
       await login(body.email, body.password);
     } catch (e) {
       throw e;
@@ -133,14 +150,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await api.setToken(null);
     setTokenState(null);
     setUser(null);
+    await AsyncStorage.removeItem('@campus_token');
+    await AsyncStorage.removeItem('@campus_user_profile');
     await AsyncStorage.removeItem('@campus_active_role');
   };
 
   const switchDemoRole = async (newRole: UserRole) => {
     setRole(newRole);
-    if (newRole === 'STUDENT') setUser(DEMO_USERS.student);
-    else if (newRole === 'TEACHER') setUser(DEMO_USERS.teacher);
-    else if (newRole === 'ADMIN') setUser(DEMO_USERS.admin);
+    let demoProfile = DEMO_USERS.student;
+    if (newRole === 'TEACHER') demoProfile = DEMO_USERS.teacher;
+    else if (newRole === 'ADMIN') demoProfile = DEMO_USERS.admin;
+
+    setUser(demoProfile);
+    await AsyncStorage.setItem('@campus_user_profile', JSON.stringify(demoProfile));
     await AsyncStorage.setItem('@campus_active_role', newRole);
 
     // Tenter de se connecter avec le compte démo réel si le backend est actif

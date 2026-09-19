@@ -15,6 +15,7 @@ import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { AIHighlightBox } from '../components/AIHighlightBox';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { MOCK_ABSENCES, MOCK_SCHEDULES } from '../data/mockData';
 import { AbsenceRequest, ScheduleItem } from '../types';
 import {
@@ -27,39 +28,94 @@ import {
   CheckCircle2,
   Clock,
   X,
+  Check,
+  XCircle,
 } from 'lucide-react-native';
 
 export const AbsenceRequestScreen: React.FC = () => {
-  const [absences, setAbsences] = useState<AbsenceRequest[]>(MOCK_ABSENCES);
-  const [schedules, setSchedules] = useState<ScheduleItem[]>(MOCK_SCHEDULES);
+  const { role, user } = useAuth();
+  const isDemoStudent = user?.email === 'etudiant@campusconnect.dev';
+  const isStaff = role === 'ADMIN' || role === 'TEACHER';
+  const [absences, setAbsences] = useState<AbsenceRequest[]>(isDemoStudent ? MOCK_ABSENCES : []);
+  const [schedules, setSchedules] = useState<ScheduleItem[]>(isDemoStudent ? MOCK_SCHEDULES : []);
   const [showForm, setShowForm] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<number>(1);
   const [reason, setReason] = useState('');
   const [hasJustificatif, setHasJustificatif] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isLive, setIsLive] = useState(false);
 
   const loadData = async () => {
     try {
       const a = await api.getAbsences();
-      if (a && a.length > 0) setAbsences(a);
-    } catch {}
+      if (a && a.length > 0) {
+        setAbsences(a);
+        setIsLive(true);
+      } else {
+        setAbsences(isDemoStudent ? MOCK_ABSENCES : []);
+        setIsLive(true);
+      }
+    } catch {
+      if (isDemoStudent) setAbsences(MOCK_ABSENCES);
+      setIsLive(false);
+    }
 
     try {
       const s = await api.getSchedules();
-      if (s && s.length > 0) setSchedules(s);
-    } catch {}
+      if (s && s.length > 0) {
+        setSchedules(s);
+        if (s[0]) setSelectedScheduleId(s[0].id);
+      } else {
+        setSchedules(isDemoStudent ? MOCK_SCHEDULES : []);
+      }
+    } catch {
+      if (isDemoStudent) setSchedules(MOCK_SCHEDULES);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [role]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
   };
+
+  const handleReviewAbsence = async (id: number, status: 'ACCEPTEE' | 'REFUSEE') => {
+    try {
+      await api.updateAbsenceStatus(
+        id,
+        status,
+        status === 'ACCEPTEE' ? 'Justificatif validé par l’administration' : 'Motif ou justificatif non conforme'
+      );
+      Alert.alert(
+        status === 'ACCEPTEE' ? 'Absence Validée' : 'Absence Refusée',
+        `La demande a été mise à jour avec succès.`
+      );
+      await loadData();
+    } catch (e) {
+      // Fallback local
+      setAbsences((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status,
+                review_comment:
+                  status === 'ACCEPTEE'
+                    ? 'Justificatif validé (Mode local)'
+                    : 'Refusé par la scolarité',
+              }
+            : item
+        )
+      );
+      Alert.alert('Statut mis à jour', `L'absence a été marquée comme ${status.toLowerCase()}.`);
+    }
+  };
+
 
   const handleAiDraft = () => {
     const aiDrafted =
@@ -119,25 +175,42 @@ export const AbsenceRequestScreen: React.FC = () => {
     >
       {/* Header action */}
       <View style={styles.topRow}>
-        <View>
-          <Text style={styles.heading}>Démarches Administratives</Text>
-          <Text style={styles.subheading}>Gestion de vos absences & justificatifs</Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.heading}>
+              {isStaff ? 'Supervision des Absences' : 'Mes Démarches d’Absence'}
+            </Text>
+            <Badge
+              label={isLive ? 'API LIVE' : 'LOCAL'}
+              tone={isLive ? 'success' : 'neutral'}
+              size="sm"
+            />
+          </View>
+          <Text style={styles.subheading}>
+            {isStaff
+              ? 'Traitement et validation des justificatifs médicaux'
+              : 'Déclarer un empêchement et suivre vos justificatifs'}
+          </Text>
         </View>
-        <TouchableOpacity
-          style={styles.newBtn}
-          onPress={() => setShowForm(!showForm)}
-          activeOpacity={0.8}
-        >
-          {showForm ? (
-            <X size={16} color="#FFF" />
-          ) : (
-            <>
-              <Plus size={16} color="#FFF" />
-              <Text style={styles.newBtnText}>Déclarer</Text>
-            </>
-          )}
-        </TouchableOpacity>
+
+        {!isStaff && (
+          <TouchableOpacity
+            style={styles.newBtn}
+            onPress={() => setShowForm(!showForm)}
+            activeOpacity={0.8}
+          >
+            {showForm ? (
+              <X size={16} color="#FFF" />
+            ) : (
+              <>
+                <Plus size={16} color="#FFF" />
+                <Text style={styles.newBtnText}>Déclarer</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
+
 
       {/* New Absence Declaration Form */}
       {showForm && (
@@ -231,35 +304,74 @@ export const AbsenceRequestScreen: React.FC = () => {
       )}
 
       {/* Absence History List */}
-      <Text style={styles.historyHeading}>Historique de vos demandes ({absences.length})</Text>
+      <Text style={styles.historyHeading}>
+        {isStaff ? `Demandes d’absence à traiter (${absences.length})` : `Historique de vos demandes (${absences.length})`}
+      </Text>
 
-      {absences.map((abs) => {
-        const isAccepted = abs.status === 'ACCEPTEE';
-        const isPending = abs.status === 'EN_ATTENTE';
-        return (
-          <Card key={abs.id} style={styles.absenceCard}>
-            <View style={styles.cardHeader}>
-              <Badge
-                label={
-                  isAccepted ? 'ACCEPTÉE' : isPending ? 'EN ATTENTE' : 'REFUSÉE'
-                }
-                tone={isAccepted ? 'success' : isPending ? 'warning' : 'danger'}
-                size="sm"
-              />
-              <Text style={styles.dateText}>{abs.created_at}</Text>
-            </View>
-
-            <Text style={styles.reasonText}>{abs.reason}</Text>
-
-            {abs.review_comment && (
-              <View style={styles.commentBox}>
-                <Text style={styles.commentLabel}>Commentaire administration :</Text>
-                <Text style={styles.commentText}>{abs.review_comment}</Text>
+      {absences.length === 0 ? (
+        <Card style={{ padding: 24, alignItems: 'center' }}>
+          <FileText size={32} color={Colors.textMuted} />
+          <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.textDark, marginTop: 10 }}>
+            {isStaff ? 'Aucune demande à traiter' : 'Aucune absence déclarée'}
+          </Text>
+          <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginTop: 4 }}>
+            {isStaff
+              ? 'Toutes les demandes d’absence ont été traitées.'
+              : 'Vous êtes à jour. Vous pouvez soumettre une déclaration en cas d’imprévu.'}
+          </Text>
+        </Card>
+      ) : (
+        absences.map((abs) => {
+          const isAccepted = abs.status === 'ACCEPTEE';
+          const isPending = abs.status === 'EN_ATTENTE';
+          return (
+            <Card key={abs.id} style={styles.absenceCard}>
+              <View style={styles.cardHeader}>
+                <Badge
+                  label={
+                    isAccepted ? 'ACCEPTÉE' : isPending ? 'EN ATTENTE' : 'REFUSÉE'
+                  }
+                  tone={isAccepted ? 'success' : isPending ? 'warning' : 'danger'}
+                  size="sm"
+                />
+                <Text style={styles.dateText}>{abs.created_at}</Text>
               </View>
-            )}
-          </Card>
-        );
-      })}
+
+              <Text style={styles.reasonText}>{abs.reason}</Text>
+
+              {abs.review_comment && (
+                <View style={styles.commentBox}>
+                  <Text style={styles.commentLabel}>Commentaire administration :</Text>
+                  <Text style={styles.commentText}>{abs.review_comment}</Text>
+                </View>
+              )}
+
+              {/* Actions de validation pour Enseignant ou Administrateur */}
+              {isStaff && isPending && (
+                <View style={styles.staffActionRow}>
+                  <Button
+                    title="Valider"
+                    variant="primary"
+                    size="sm"
+                    onPress={() => handleReviewAbsence(abs.id, 'ACCEPTEE')}
+                    icon={<Check size={14} color="#FFF" />}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title="Refuser"
+                    variant="danger"
+                    size="sm"
+                    onPress={() => handleReviewAbsence(abs.id, 'REFUSEE')}
+                    icon={<XCircle size={14} color="#FFF" />}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              )}
+            </Card>
+          );
+        })
+      )}
+
     </ScrollView>
   );
 };
@@ -450,4 +562,13 @@ const styles = StyleSheet.create({
     color: Colors.textMedium,
     marginTop: 2,
   },
+  staffActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
 });
+

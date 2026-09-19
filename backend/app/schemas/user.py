@@ -5,6 +5,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from app.models.user import UserRole
 
 
+from app.schemas.school_class import ClassResponse
+
+
 class UserBase(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
@@ -19,6 +22,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
+    class_id: int | None = None
 
 
 class UserResponse(UserBase):
@@ -26,6 +30,7 @@ class UserResponse(UserBase):
     role: UserRole
     is_active: bool
     class_id: int | None = None
+    classe: ClassResponse | None = None
     created_at: datetime
     updated_at: datetime
 

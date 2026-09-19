@@ -215,6 +215,18 @@ class ApiClient {
     });
   }
 
+  async updateAbsenceStatus(
+    absenceId: number,
+    status: 'ACCEPTEE' | 'REFUSEE',
+    review_comment?: string
+  ): Promise<AbsenceRequest> {
+    return await this.request<AbsenceRequest>(`${ApiConfig.endpoints.absences}/${absenceId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, review_comment }),
+    });
+  }
+
+
   // --- Objets Perdus & Trouvés ---
   async getLostFoundItems(params?: {
     type?: string;
